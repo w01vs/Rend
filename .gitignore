@@ -1,0 +1,11 @@
+build
+build-*
+.vs
+.vscode
+*.exe
+rend*
+cmake*
+comp
+.cache
+*.out
+*.png
