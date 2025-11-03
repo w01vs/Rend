@@ -1,0 +1,6 @@
+reminder that structs currently also parse for default initialized values, e.g. declaration+assignment
+reminder that construction doesnt exist :sob: (e.g. there is no way to make an instance of a struct)
+
+reminder that there is no flag for incomplete or complete types in TypeRegistry
+
+maybe swap from clang-format to uncrustify to see if it works with lambdas etc
