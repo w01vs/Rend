@@ -1,5 +1,8 @@
 #include "parser.hpp"
 
+#define REPORT_ERROR(loc, msg, type) \
+    reporter_.report_error(loc, msg, type, __FILE__, __LINE__);
+
 const std::unordered_map<TokenType, int> Parser::PRECEDENCE{
     {TokenType::OP_LOGICAL_OR, 1},
     {TokenType::OP_LOGICAL_AND, 2},
@@ -48,6 +51,19 @@ Parser::Parser(TokenStream& stream, ErrorReporter& reporter)
 {
 }
 
+program_ptr Parser::parse()
+{
+    auto token = stream_.peek();
+    std::vector<statements_ptr_var> stmts;
+    SourceLocation loc{};
+    while(token.has_value() && token.value().type != TokenType::EOF_)
+    {
+        stmts.emplace_back(parse_statement());
+        token = stream_.peek();
+    }
+    return builder_.build_program(loc, std::move(stmts));
+}
+
 // Will return the appropriate statement based on the next token
 statements_ptr_var Parser::parse_statement() const
 {
@@ -55,7 +71,7 @@ statements_ptr_var Parser::parse_statement() const
     if(!token.has_value())
     {
         auto empty_loc = SourceLocation{0, 0, false};
-        reporter_.report_error(empty_loc, "No statement was found.", ErrorType::UNKNOWN);
+        REPORT_ERROR(empty_loc, "No statement was found.", ErrorType::UNKNOWN);
         synchronize_tokens();
         return builder_.build_stmt_err(empty_loc);
     }
@@ -92,7 +108,7 @@ statements_ptr_var Parser::parse_statement() const
         }
     default:
         {
-            reporter_.report_error(token.value().loc,
+            REPORT_ERROR(token.value().loc,
                                    "No statement was found.",
                                    ErrorType::UNKNOWN);
             synchronize_tokens();
@@ -111,29 +127,46 @@ statements_ptr_var Parser::parse_from_ident() const
     if(!token.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
+        REPORT_ERROR(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
 
     switch(token.value().type)
     {
-    case TokenType::OP_EQUAL:
+    case TokenType::OP_ASSIGN:
         {
+            auto ident_name = stream_.consume().value();
+            stream_.consume();
+
+            auto ast_ident_name = ident_name.value;
+            auto expr = parse_expression();
+
+            auto semi = stream_.expect(TokenType::DELIMITER_SEMICOLON);
+            if(!semi.has_value())
+            {
+                REPORT_ERROR(ident_name.loc,
+                                       "Expected ';' after assignment.",
+                                       ErrorType::SYNTAX);
+                synchronize_tokens();
+                return builder_.build_stmt_err(ident_name.loc);
+            }
+
+            return builder_.build_assign(ident_name.loc, ast_ident_name, std::move(expr));
         }
     case TokenType::IDENTIFIER:
         return parse_declassign();
     default:
         {
             auto loc = stream_.peek().value().loc;
-            reporter_.report_error(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
+            REPORT_ERROR(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
             synchronize_tokens();
             return builder_.build_stmt_err(loc);
         }
     }
 }
 
-// Expects tokens: IDENT OP_EQUAL
+// Expects tokens: IDENT OP_ASSIGN
 // Will continue parsing assuming that those tokens were confirmed
 // Will return an assignment
 statements_ptr_var Parser::parse_assign() const
@@ -144,7 +177,7 @@ statements_ptr_var Parser::parse_assign() const
     auto semi = stream_.expect(TokenType::DELIMITER_SEMICOLON);
     if(!semi.has_value())
     {
-        reporter_.report_error(name.loc, "Expected ';' after declaration.", ErrorType::SYNTAX);
+        REPORT_ERROR(name.loc, "Expected ';' after declaration.", ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(name.loc);
     }
@@ -165,14 +198,14 @@ statements_ptr_var Parser::parse_declassign() const
     if(!token.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
+        REPORT_ERROR(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
 
     switch(token.value().type)
     {
-    case TokenType::OP_EQUAL:
+    case TokenType::OP_ASSIGN:
         {
             auto ident_type = stream_.consume().value();
             auto ident_name = stream_.consume().value();
@@ -185,7 +218,7 @@ statements_ptr_var Parser::parse_declassign() const
             auto semi = stream_.expect(TokenType::DELIMITER_SEMICOLON);
             if(!semi.has_value())
             {
-                reporter_.report_error(ident_name.loc,
+                REPORT_ERROR(ident_name.loc,
                                        "Expected ';' after declaration and assignment.",
                                        ErrorType::SYNTAX);
                 synchronize_tokens();
@@ -212,7 +245,7 @@ statements_ptr_var Parser::parse_declassign() const
     default:
         {
             auto loc = stream_.peek().value().loc;
-            reporter_.report_error(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
+            REPORT_ERROR(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
             synchronize_tokens();
             return builder_.build_stmt_err(loc);
         }
@@ -220,14 +253,14 @@ statements_ptr_var Parser::parse_declassign() const
 }
 
 // whatever an expression is mhm
-expression_ptr_var Parser::parse_expression() const
+expression_ptr_var Parser::parse_expression(int min_prec) const
 {
     auto token = stream_.peek();
 
     if(!token.has_value())
     {
         auto empty_loc = SourceLocation{0, 0, false};
-        reporter_.report_error(empty_loc,
+        REPORT_ERROR(empty_loc,
                                "Expected expression but found end of input.",
                                ErrorType::SYNTAX);
         synchronize_tokens();
@@ -249,7 +282,7 @@ expression_ptr_var Parser::parse_expression() const
     case TokenType::BOOL_LITERAL:
         lhs = builder_.build_boolean(token.value().loc, string_to_bool(token.value().value));
         break;
-    case TokenType::PAREN_R:
+    case TokenType::PAREN_L:
         {
             auto expr = parse_expression();
             auto close = stream_.expect(TokenType::PAREN_L);
@@ -257,7 +290,7 @@ expression_ptr_var Parser::parse_expression() const
             if(!close.has_value())
             {
                 auto loc = stream_.peek().value().loc;
-                reporter_.report_error(loc, "Expected ')' after expression.", ErrorType::SYNTAX);
+                REPORT_ERROR(loc, "Expected ')' after expression.", ErrorType::SYNTAX);
                 synchronize_tokens();
                 return builder_.build_expr_err(loc);
             }
@@ -273,7 +306,7 @@ expression_ptr_var Parser::parse_expression() const
     default:
         {
             auto loc = stream_.peek().value().loc;
-            reporter_.report_error(loc, "Invalid expression.", ErrorType::SYNTAX);
+            REPORT_ERROR(loc, "Invalid expression.", ErrorType::SYNTAX);
             synchronize_tokens();
             return builder_.build_expr_err(loc);
         }
@@ -286,7 +319,7 @@ expression_ptr_var Parser::parse_expression() const
         if(op.has_value())
         {
             auto it = PRECEDENCE.find(op->type);
-            if(it != PRECEDENCE.end())
+            if(it != PRECEDENCE.end() && it->second >= min_prec)
                 prec = it->second;
             else
                 break;
@@ -296,7 +329,7 @@ expression_ptr_var Parser::parse_expression() const
 
         auto [type, val, loc] = stream_.consume().value();
         const int next_prec = prec.value() + 1;
-        auto rhs = parse_expression();
+        auto rhs = parse_expression(next_prec);
 
         lhs = builder_.build_expression(token.value().loc,
                                         std::move(lhs),
@@ -317,7 +350,7 @@ statements_ptr_var Parser::parse_builtin_var(BuiltinType type) const
     if(!token.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
+        REPORT_ERROR(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -329,7 +362,7 @@ statements_ptr_var Parser::parse_builtin_var(BuiltinType type) const
 
     switch(token.value().type)
     {
-    case TokenType::OP_EQUAL:
+    case TokenType::OP_ASSIGN:
         {
             stream_.consume();
             auto expr = parse_expression();
@@ -337,7 +370,7 @@ statements_ptr_var Parser::parse_builtin_var(BuiltinType type) const
             if(!semi.has_value())
             {
                 auto loc = stream_.peek().value().loc;
-                reporter_.report_error(loc,
+                REPORT_ERROR(loc,
                                        "Expected ';' after declaration and assignment.",
                                        ErrorType::SYNTAX);
                 synchronize_tokens();
@@ -357,7 +390,7 @@ statements_ptr_var Parser::parse_builtin_var(BuiltinType type) const
     default:
         {
             auto loc = stream_.peek().value().loc;
-            reporter_.report_error(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
+            REPORT_ERROR(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
             synchronize_tokens();
             return builder_.build_stmt_err(loc);
         }
@@ -376,7 +409,7 @@ statements_ptr_var Parser::parse_return() const
     if(!semi.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc, "Expected ';' after return statement.", ErrorType::SYNTAX);
+        REPORT_ERROR(loc, "Expected ';' after return statement.", ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -394,7 +427,7 @@ statements_ptr_var Parser::parse_while() const
     if(!open_paren.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected '(' after 'while' on line " +
                                    std::to_string(token.loc.line),
                                ErrorType::SYNTAX);
@@ -408,7 +441,7 @@ statements_ptr_var Parser::parse_while() const
     if(!close_paren.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected ')' after expression on line " +
                                    std::to_string(token.loc.line),
                                ErrorType::SYNTAX);
@@ -431,7 +464,7 @@ statements_ptr_var Parser::parse_if() const
     if(!open_paren.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected '(' after 'if' on line " + std::to_string(token.loc.line),
                                ErrorType::SYNTAX);
         synchronize_tokens();
@@ -444,7 +477,7 @@ statements_ptr_var Parser::parse_if() const
     if(!close_paren.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected ')' after expression on line " +
                                    std::to_string(token.loc.line),
                                ErrorType::SYNTAX);
@@ -468,27 +501,36 @@ std::optional<else_ptr_var> Parser::parse_else() const
         return std::nullopt;
 
     std::optional<expression_ptr_var> cond = std::nullopt;
-    auto next_token = stream_.peek();
-    if(next_token.has_value() && next_token.value().type == TokenType::PAREN_L)
+    if(stream_.peek().has_value() && stream_.peek().value().type == TokenType::KW_IF)
     {
         stream_.consume();
-        cond = parse_expression();
-        auto close_paren = stream_.expect(TokenType::PAREN_R);
-        if(!close_paren.has_value())
+        auto next_token = stream_.peek();
+        if(next_token.has_value() && next_token.value().type == TokenType::PAREN_L)
         {
-            auto loc = stream_.peek().value().loc;
-            reporter_.report_error(loc,
-                                   "Expected ')' after else condition on line " +
-                                       std::to_string(else_kw->loc.line),
-                                   ErrorType::SYNTAX);
-            synchronize_tokens();
-            return std::nullopt;
+            stream_.consume();
+            cond = parse_expression();
+            auto close_paren = stream_.expect(TokenType::PAREN_R);
+            if(!close_paren.has_value())
+            {
+                auto loc = stream_.peek().value().loc;
+                REPORT_ERROR(loc,
+                                       "Expected ')' after else condition on line " +
+                                           std::to_string(else_kw->loc.line),
+                                       ErrorType::SYNTAX);
+                synchronize_tokens();
+                return std::nullopt;
+            }
         }
     }
 
     auto scope = parse_scope();
 
-    return builder_.build_else(else_kw->loc, std::move(cond), std::move(scope));
+    auto else_if_clause = parse_else();
+
+    return builder_.build_else(else_kw->loc,
+                               std::move(cond),
+                               std::move(scope),
+                               std::move(else_if_clause));
 }
 
 // Expects tokens: BRACE_L
@@ -500,7 +542,7 @@ scope_err_ptr_var Parser::parse_scope() const
     if(!open_br.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected '{' at start of scope on line " + std::to_string(loc.line),
                                ErrorType::SYNTAX);
         synchronize_tokens();
@@ -518,7 +560,7 @@ scope_err_ptr_var Parser::parse_scope() const
     if(!close_br.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected '}' at end of scope on line " +
                                    std::to_string(open_br->loc.line),
                                ErrorType::SYNTAX);
@@ -539,7 +581,7 @@ statements_ptr_var Parser::parse_struct() const
     if(!token.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected identifier as type name on line " +
                                    std::to_string(loc.line),
                                ErrorType::SYNTAX);
@@ -553,7 +595,7 @@ statements_ptr_var Parser::parse_struct() const
     if(!brace_l.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected '{' after struct declaration on line " +
                                    std::to_string(loc.line),
                                ErrorType::SYNTAX);
@@ -569,7 +611,7 @@ statements_ptr_var Parser::parse_struct() const
         if(!member.has_value())
         {
             synchronize_tokens();
-            reporter_.report_error(next->loc,
+            REPORT_ERROR(next->loc,
                                    "Invalid member declaration in struct on line " +
                                        std::to_string(next->loc.line),
                                    ErrorType::SYNTAX);
@@ -583,7 +625,7 @@ statements_ptr_var Parser::parse_struct() const
     if(!brace_r.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected '}' after struct body on line " + std::to_string(loc.line),
                                ErrorType::SYNTAX);
         synchronize_tokens();
@@ -603,14 +645,14 @@ struct_body_var Parser::parse_struct_declassign() const
     if(!token.has_value())
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
+        REPORT_ERROR(loc, "Unexpected end of input after identifier.", ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
 
     switch(token.value().type)
     {
-    case TokenType::OP_EQUAL:
+    case TokenType::OP_ASSIGN:
         {
             auto ident_type = stream_.consume().value();
             auto ident_name = stream_.consume().value();
@@ -623,7 +665,7 @@ struct_body_var Parser::parse_struct_declassign() const
             auto semi = stream_.expect(TokenType::DELIMITER_SEMICOLON);
             if(!semi.has_value())
             {
-                reporter_.report_error(ident_name.loc,
+                REPORT_ERROR(ident_name.loc,
                                        "Expected ';' after declaration and assignment.",
                                        ErrorType::SYNTAX);
                 synchronize_tokens();
@@ -650,7 +692,7 @@ struct_body_var Parser::parse_struct_declassign() const
     default:
         {
             auto loc = stream_.peek().value().loc;
-            reporter_.report_error(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
+            REPORT_ERROR(loc, "Invalid statement after identifier.", ErrorType::SYNTAX);
             synchronize_tokens();
             return builder_.build_stmt_err(loc);
         }
@@ -666,7 +708,7 @@ std::optional<struct_body_var> Parser::struct_helper() const
        stream_.peek(1).value().type != TokenType::IDENTIFIER)
     {
         auto loc = stream_.peek().value().loc;
-        reporter_.report_error(loc,
+        REPORT_ERROR(loc,
                                "Expected member declaration in struct on line " +
                                    std::to_string(loc.line),
                                ErrorType::SYNTAX);
@@ -692,7 +734,7 @@ void Parser::synchronize_tokens() const
         if(!token.has_value())
         {
             auto loc = SourceLocation{0, 0, false};
-            reporter_.report_error(loc,
+            REPORT_ERROR(loc,
                                    "Unexpected end of input during error recovery.",
                                    ErrorType::SYNTAX);
         }

@@ -9,3 +9,4 @@ comp
 .cache
 *.out
 *.png
+hir_output.txt

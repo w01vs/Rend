@@ -1,9 +1,16 @@
+#define DEBUG true
+
 #include "lexer.hpp"
+#include "parser.hpp"
+#include "semantics.hpp"
+#include "tokenstream.hpp"
+#include "hir_generator.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+
 
 bool errors_found = false;
 
@@ -29,7 +36,6 @@ void lex_source(const std::string_view source, std::vector<Token>& tokens)
 
 int main(int argc, char* argv[])
 {
-
     std::cout << "Rend Compiler v0.1.0\n";
     std::cout << "Using C++20\n";
     if(argc != 2)
@@ -56,9 +62,38 @@ int main(int argc, char* argv[])
     std::vector<Token> tokens;
     lex_source(to_compile, tokens);
 
+    TokenStream tstream{tokens};
+    ErrorReporter reporter{};
+
+    Parser parser(tstream, reporter);
+    program_ptr program = parser.parse();
+
+    SemanticAnalyzer semantic{std::move(program), reporter};
+    program = semantic.analyze();
+    if(reporter.has_errors())
+    {
+        errors_found = true;
+        reporter.print_diagnostics();
+        return EXIT_FAILURE;
+    }
+
+    HIRGen hirgen(program, semantic.variables());
+    std::vector<HIR>& hir_stmts = hirgen.generate();
+
+    std::ofstream hir_out("hir_output.txt", std::ios::out);
+    for(auto& stmt : hir_stmts)
+    {
+        std::string hir_str = hir_print(stmt).data();
+        hir_out << hir_str << std::endl;
+    }
+    hir_out.close();
+
+    return EXIT_SUCCESS; 
+
+    // Following code is for assembling and linking the generated assembly
+    // but HIR generation is the current focus. LIR/assembly generation is pending.
     int nasm_exitcode = system("nasm -felf64 -g rend.asm");
     std::cout << "nasm exited assembling with code " << nasm_exitcode << std::endl;
     int gcc_exitcode = system("gcc -g rend.o -o rend -lc");
     std::cout << "gcc exited linking with code " << gcc_exitcode << std::endl;
-    return errors_found ? EXIT_FAILURE : EXIT_SUCCESS;
 }

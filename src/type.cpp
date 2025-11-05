@@ -201,7 +201,6 @@ type::TypeRegistry::TypeRegistry()
     struct temp : type::BuiltinType {
         temp(std::string_view name, int bytes) : type::BuiltinType(name, bytes) {}
     };
-    std::cout << "size of derived temp:gtype: " << sizeof(temp) << "\n";
     int_ = std::make_shared<temp>("int", 4);
     bool_ = std::make_shared<temp>("bool", 8);
     void_ = std::make_shared<temp>("void", 0);

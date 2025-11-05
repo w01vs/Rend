@@ -1,7 +1,12 @@
 int y = 3;
-int x = 1 + 2 * 3;
-while(y < 11){
-    y = y  + 1;
-}
+int x = 5;
 
-return y;
+if(x == y) {
+    return x;
+}
+else if(11 == x){
+    return 42;
+}
+else {
+    return 69;
+}

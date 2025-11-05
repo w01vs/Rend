@@ -8,7 +8,7 @@
 
 class TokenStream {
   public:
-    TokenStream(std::vector<Token>& tokens) : tokens_(tokens) {}
+    TokenStream(std::vector<Token>& tokens);
 
     std::optional<Token> peek(size_t offset = 0) const; 
 

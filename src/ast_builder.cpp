@@ -23,9 +23,9 @@ if_ptr ASTBuilder::build_if(SourceLocation& loc, expression_ptr_var&& cond,
 }
 
 else_ptr ASTBuilder::build_else(SourceLocation& loc, std::optional<expression_ptr_var>&& cond,
-                                scope_err_ptr_var&& scope) const
+                                scope_err_ptr_var&& scope, std::optional<else_ptr_var>&& else_if_clause) const
 {
-    return std::make_unique<ASTElse>(loc, std::move(cond), std::move(scope));
+    return std::make_unique<ASTElse>(loc, std::move(cond), std::move(scope), std::move(else_if_clause));
 }
 
 assign_ptr ASTBuilder::build_assign(SourceLocation& loc, std::string_view name,
@@ -67,7 +67,7 @@ while_ptr ASTBuilder::build_while(SourceLocation& loc, expression_ptr_var&& cond
 }
 
 scope_ptr ASTBuilder::build_scope(SourceLocation& loc,
-                                  scope_err_vec_ptr&& stmts) const
+                                  stmt_vec_err_ptr&& stmts) const
 {
     return std::make_unique<ASTScope>(loc, std::move(stmts));
 }

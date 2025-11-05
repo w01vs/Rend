@@ -19,6 +19,7 @@ class Lexer {
     size_t column_;
     size_t errors_;
 
+    Token assign_or_equals();
     Token identifier_or_keyword();
     Token number_literal();
     Token excl_mark();
