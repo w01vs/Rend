@@ -1,4 +1,7 @@
 #include "lexer.hpp"
+#include "parser.hpp"
+#include "semantics.hpp"
+#include "tokenstream.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -55,6 +58,15 @@ int main(int argc, char* argv[])
 
     std::vector<Token> tokens;
     lex_source(to_compile, tokens);
+
+    TokenStream tstream{tokens};
+    ErrorReporter reporter{};
+
+    Parser parser(tstream, reporter);
+    program_ptr program = parser.parse();
+
+    SemanticAnalyzer semantic{std::move(program), reporter};
+    program = semantic.analyze();
 
     int nasm_exitcode = system("nasm -felf64 -g rend.asm");
     std::cout << "nasm exited assembling with code " << nasm_exitcode << std::endl;

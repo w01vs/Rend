@@ -2,6 +2,7 @@
 #define AST_DEF_HPP
 
 #pragma once
+#include "operators.hpp"
 #include "tokens.hpp"
 #include "type.hpp"
 #include <memory>
@@ -9,34 +10,6 @@
 #include <string>
 #include <variant>
 #include <vector>
-
-enum class BuiltinType : char {
-    INT,
-    BOOL,
-};
-
-enum class Operator {
-    MUL,
-    DIV,
-    MOD,
-    ADD,
-    SUB,
-    LSH,
-    RSH,
-    LESS,
-    GREATER,
-    LESSEQ,
-    GREATEREQ,
-    BAND,
-    XOR,
-    BOR,
-    OR,
-    AND,
-    EQ,
-    NEQ,
-    NOT,
-    UNDEFINED,
-};
 
 struct ASTNode {
     SourceLocation loc;
@@ -96,9 +69,7 @@ struct ASTExpression;
 using expression_ptr = std::unique_ptr<ASTExpression>;
 
 using expression_ptr_var =
-    std::variant<expression_ptr, identifier_ptr,
-                 integer_ptr, boolean_ptr,
-                 expr_err_ptr>;
+    std::variant<expression_ptr, identifier_ptr, integer_ptr, boolean_ptr, expr_err_ptr>;
 
 struct ASTExpression : public ASTExpressionBase {
     expression_ptr_var lhs;
@@ -110,7 +81,6 @@ struct ASTExpression : public ASTExpressionBase {
     {
     }
 };
-
 
 struct ASTReturn : public ASTStatementBase {
     expression_ptr_var val;
@@ -138,9 +108,10 @@ struct ASTDeclareAssign : public ASTStatementBase {
     std::string_view type_name;
     std::string_view name;
     expression_ptr_var expr;
-    ASTDeclareAssign(SourceLocation& loc, std::string_view type,
-                     std::string_view name, expression_ptr_var&& expr)
-        : ASTStatementBase(loc), type_name(std::move(type)), name(std::move(name)), expr(std::move(expr)), type(nullptr)
+    ASTDeclareAssign(SourceLocation& loc, std::string_view type, std::string_view name,
+                     expression_ptr_var&& expr)
+        : ASTStatementBase(loc), type_name(std::move(type)), name(std::move(name)),
+          expr(std::move(expr)), type(nullptr)
     {
     }
 };
@@ -280,5 +251,4 @@ struct ASTProgram : public ASTNode {
 };
 
 using program_ptr = std::unique_ptr<ASTProgram>;
-
 #endif // AST_DEF_HPP

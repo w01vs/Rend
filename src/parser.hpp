@@ -10,9 +10,25 @@
 #include <memory>
 #include <unordered_map>
 
+enum class BuiltinType : char {
+    INT,
+    BOOL,
+};
+
 class Parser {
   public:
     Parser(TokenStream& stream, ErrorReporter& reporter);
+
+    program_ptr&& parse();
+
+  private:
+    static const std::unordered_map<TokenType, int> PRECEDENCE;
+    static const std::unordered_map<TokenType, Operator> TOKEN_OP;
+
+    type::TypeRegistry& type_registry_;
+    TokenStream& stream_;
+    ErrorReporter& reporter_;
+    ASTBuilder builder_;
 
     statements_ptr_var parse_statement() const;
 
@@ -41,15 +57,6 @@ class Parser {
     std::optional<struct_body_var> struct_helper() const;
 
     scope_err_ptr_var parse_scope() const;
-
-  private:
-    static const std::unordered_map<TokenType, int> PRECEDENCE;
-    static const std::unordered_map<TokenType, Operator> TOKEN_OP;
-
-    type::TypeRegistry& type_registry_;
-    TokenStream& stream_;
-    ErrorReporter& reporter_;
-    ASTBuilder builder_;
 
     void synchronize_tokens() const;
 

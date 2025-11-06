@@ -11,11 +11,12 @@ set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/Release" )
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/Debug" )
 
 add_executable(Rend
-"src2/main.cpp"
-"src2/lexer.cpp"
-"src2/tokenstream.cpp"
-"src2/type.cpp"
-"src2/ast_builder.cpp"
-"src2/parser.cpp"
-"src2/semantics.cpp"
+"src/main.cpp"
+"src/lexer.cpp"
+"src/tokenstream.cpp"
+"src/type.cpp"
+"src/ast_builder.cpp"
+"src/parser.cpp"
+"src/semantics.cpp"
+"src/hir_generator.cpp"
 )

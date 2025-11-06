@@ -14,9 +14,13 @@ namespace semantics
             return base == other.base && op == other.op && param == other.param;
         }
     };
+
+    struct OperatorResult {
+        std::shared_ptr<type::BuiltinType> result;
+        // coerce rules here, e.g. type promotion (int -> float) or division type (integer div)
+    };
 } // namespace semantics
 
-// **DEFINE THE SPECIALIZATION IMMEDIATELY AFTER THE STRUCT**
 namespace std
 {
     template <> struct hash<semantics::OperatorMatrixIndex> {

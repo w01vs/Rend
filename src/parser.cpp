@@ -48,6 +48,18 @@ Parser::Parser(TokenStream& stream, ErrorReporter& reporter)
 {
 }
 
+program_ptr&& Parser::parse()
+{
+    auto token = stream_.peek();
+    std::vector<statements_ptr_var> stmts;
+    SourceLocation loc{};
+    if(token.has_value() && token.value().type != TokenType::EOF_)
+    {
+        stmts.emplace_back(parse_statement());
+    }
+    return builder_.build_program(loc, std::move(stmts));
+}
+
 // Will return the appropriate statement based on the next token
 statements_ptr_var Parser::parse_statement() const
 {
