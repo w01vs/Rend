@@ -23,7 +23,15 @@ class HIRGen {
 
     VirtualRegisterID current_register_;
 
-    void unfold_expression(expression_ptr_var& expr);
+    void visit_hirexpr(HIRExprFactor& fac);
+
+    using FlattenedExpr = std::variant<VirtualRegisterID, int, std::string_view, expression_ptr>;
+
+    void fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator op) const;
+
+    void collect_operands(expression_ptr_var&, std::vector<FlattenedExpr>&, Operator op) const;
+
+    HIRExprFactor unfold_expression(expression_ptr_var& expr);
 
     void analyze_stmt(statements_ptr_var& node);
 

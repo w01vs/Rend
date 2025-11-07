@@ -5,9 +5,13 @@
 #include <string>
 #include <variant>
 
-using VirtualRegisterID = int;
+struct VirtualRegisterID {
+    int value;
+    explicit VirtualRegisterID(int v) : value(v) {}
+};
+
 using LabelID = int;
-using HIRExprFactor = std::variant<VirtualRegisterID, int, bool, std::string_view>;
+using HIRExprFactor = std::variant<VirtualRegisterID, int, std::string_view>;
 
 struct HIRJump {
     LabelID label;
