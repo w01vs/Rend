@@ -15,7 +15,8 @@ class HIRGen {
     program_ptr& program_;
     int loop_depth_ = 0;
 
-    using HIR = std::variant<HIRAssign, HIRUnaryOp, HIRBinaryOp, HIRJump, HIRCondJump, LabelID>;
+    using HIR = std::variant<HIRAssign, HIRUnaryOp, HIRBinaryOp, HIRJump, HIRCondJump, LabelID,
+                             HIRLoad, HIRStore>;
 
     std::vector<HIR> hir_stmt_;
 
@@ -25,7 +26,9 @@ class HIRGen {
 
     void visit_hirexpr(HIRExprFactor& fac);
 
-    using FlattenedExpr = std::variant<VirtualRegisterID, int, std::string_view, expression_ptr>;
+    using FlattenedExpr = std::variant<VirtualRegisterID, int, expression_ptr, std::string_view>;
+
+    HIRExprFactor handle_flattened_expr(std::vector<FlattenedExpr>& exprs);
 
     void fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator op) const;
 

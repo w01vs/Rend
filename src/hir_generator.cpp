@@ -13,6 +13,8 @@ program_ptr&& HIRGen::analyze()
 
 void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator op) const
 {
+    std::vector<FlattenedExpr> flattened_operands{};
+    flattened_operands.reserve(operands.size());
     switch(op)
     {
     case Operator::ADD:
@@ -25,7 +27,12 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                     int constant = std::get<int>(flattened);
                     folded += constant;
                 }
+                else
+                {
+                    flattened_operands.push_back(std::move(flattened));
+                }
             }
+            flattened_operands.emplace_back(folded);
         }
     case Operator::MUL:
         {
@@ -37,22 +44,123 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                     int constant = std::get<int>(flattened);
                     folded *= constant;
                 }
+                else
+                {
+                    flattened_operands.push_back(std::move(flattened));
+                }
             }
+            flattened_operands.emplace_back(folded);
+        }
+    case Operator::BAND:
+        {
+            int folded = -1;
+            for(auto& flattened : operands)
+            {
+                if(std::holds_alternative<int>(flattened))
+                {
+                    int constant = std::get<int>(flattened);
+                    folded &= constant;
+                }
+                else
+                {
+                    flattened_operands.push_back(std::move(flattened));
+                }
+            }
+            flattened_operands.emplace_back(folded);
+        }
+    case Operator::AND:
+        {
+            bool folded;
+            for(auto& flattened : operands)
+            {
+                if(std::holds_alternative<int>(flattened))
+                {
+                    int constant = std::get<int>(flattened);
+                    folded = constant == 1 ? true : false;
+                    if(!folded)
+                        break;
+                }
+                else
+                {
+                    flattened_operands.push_back(std::move(flattened));
+                }
+            }
+            if(!folded)
+            {
+                flattened_operands.clear();
+                flattened_operands.emplace_back(0);
+                return;
+            }
+            flattened_operands.emplace_back(1);
+        }
+    case Operator::BOR:
+        {
+            int folded = 0;
+            for(auto& flattened : operands)
+            {
+                if(std::holds_alternative<int>(flattened))
+                {
+                    int constant = std::get<int>(flattened);
+                    folded |= constant;
+                }
+                else
+                {
+                    flattened_operands.push_back(std::move(flattened));
+                }
+            }
+            flattened_operands.emplace_back(folded);
+        }
+    case Operator::OR:
+        {
+            bool folded;
+            for(auto& flattened : operands)
+            {
+                if(std::holds_alternative<int>(flattened))
+                {
+                    int constant = std::get<int>(flattened);
+                    folded = constant == 1 ? true : false;
+                    if(folded)
+                        break;
+                }
+                else
+                {
+                    flattened_operands.push_back(std::move(flattened));
+                }
+            }
+            flattened_operands.emplace_back(folded ? 1 : 0);
+        }
+    case Operator::XOR:
+        {
+            int folded = 0;
+            for(auto& flattened : operands)
+            {
+                if(std::holds_alternative<int>(flattened))
+                {
+                    int constant = std::get<int>(flattened);
+                    folded ^= constant;
+                }
+                else
+                {
+                    flattened_operands.push_back(std::move(flattened));
+                }
+            }
+            flattened_operands.push_back(folded);
         }
     default:
         break;
     }
+    operands = std::move(flattened_operands);
 }
 
 void HIRGen::collect_operands(expression_ptr_var& expr, std::vector<FlattenedExpr>& operands,
                               Operator op) const
 {
     std::visit(Overload{[&operands](integer_ptr& integer) { operands.push_back(integer->value); },
-                        [&operands](boolean_ptr& boolean)
-                        { operands.push_back(static_cast<int>(boolean->value)); },
+                        [&operands](boolean_ptr& boolean) {
+                            operands.push_back(static_cast<int>(boolean->value));
+                        },
                         [&operands](identifier_ptr& ident) { operands.push_back(ident->name); },
-                        [&operands, &op, this](expression_ptr& expr)
-                        {
+                        [&operands, &op, this](expression_ptr& expr) {
                             if(expr->op == op)
                             {
                                 collect_operands(expr->lhs, operands, op);
@@ -61,34 +169,86 @@ void HIRGen::collect_operands(expression_ptr_var& expr, std::vector<FlattenedExp
                             }
 
                             operands.push_back(std::move(expr));
-                        }},
+                        },
+                        [](auto&&) {}},
                expr);
 }
 
 HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
 {
-    return std::visit(Overload{[](integer_ptr& integer) -> HIRExprFactor
-                               { return VirtualRegisterID(integer->value); },
-                               [](boolean_ptr& boolean) -> HIRExprFactor
-                               { return static_cast<int>(boolean->value); },
-                               [this](identifier_ptr& ident) -> HIRExprFactor
-                               { return ident->name; },
-                               [this](expression_ptr& expr) -> HIRExprFactor
-                               {
-                                   Operator op = expr->op;
-                                   // if op is associative and commutative
-                                   std::vector<FlattenedExpr> operands{};
-                                   collect_operands(expr->lhs, operands, op);
-                                   collect_operands(expr->rhs, operands, op);
+    return std::visit(
+        Overload{[](integer_ptr& integer) -> HIRExprFactor { return int(integer->value); },
+                 [](boolean_ptr& boolean) -> HIRExprFactor {
+                     return static_cast<int>(boolean->value);
+                 },
+                 [this](identifier_ptr& ident) -> HIRExprFactor {
+                     VirtualRegisterID vreg{current_register_.value++};
+                     hir_stmt_.push_back(HIRLoad{vreg, ident->name});
+                     return vreg;
+                 },
+                 [this](expression_ptr& expr) -> HIRExprFactor {
+                     Operator op = expr->op;
+                     switch(op)
+                     {
+                         // if op is associative and commutative
+                         // flatten expression and fold it
+                     case Operator::ADD:
+                     case Operator::MUL:
+                     case Operator::AND:
+                     case Operator::OR:
+                     case Operator::XOR:
+                     case Operator::BAND:
+                     case Operator::BOR:
+                         {
+                             std::vector<FlattenedExpr> operands{};
+                             collect_operands(expr->lhs, operands, op);
+                             collect_operands(expr->rhs, operands, op);
 
-                                   fold_flat_constants(operands, op);
+                             for(auto& flatexpr : operands)
+                             {
+                                 if(std::holds_alternative<expression_ptr>(flatexpr))
+                                 {
+                                     expression_ptr_var ptr =
+                                         std::move(std::get<expression_ptr>(flatexpr));
+                                     HIRExprFactor res = unfold_expression(ptr);
+                                     std::visit(Overload{[&flatexpr](VirtualRegisterID& vreg) {
+                                                             flatexpr = vreg;
+                                                         },
+                                                         [&flatexpr](int i) { flatexpr = i; },
+                                                         [&flatexpr](std::string_view& view) {
+                                                             flatexpr = view;
+                                                         },
+                                                         [](auto&&) {}},
+                                                res);
+                                 }
+                             }
 
-                                   // if op is not associative and commutative
+                             fold_flat_constants(operands, op);
+                             // iterate remaining things and add instructions and return vreg with
+                             // result
+                             handle_flattened_expr(operands);
+                         }
 
-                                   return 1;
-                               },
-                               [](auto&&) -> HIRExprFactor { return 1; }},
-                      expr);
+                         // try folding constants if both sides of expr are known
+                     default:
+                         break;
+                     }
+
+                     return 1;
+                 },
+                 [](auto&&) -> HIRExprFactor { return VirtualRegisterID{-1}; }},
+        expr);
+}
+// Flattenedexpr can contain identifiers, virtual registers or integer literals
+// there SHOULD not be any expression_ptr's
+HIRExprFactor HIRGen::handle_flattened_expr(std::vector<FlattenedExpr>& exprs)
+{
+    if(exprs.size() == 1)
+    {
+        // std visit and assign
+    }
+
+    return 1;
 }
 
 void HIRGen::analyze_stmt(statements_ptr_var& node)
@@ -115,8 +275,7 @@ void HIRGen::analyze_else_var(else_ptr_var& node)
 
 void HIRGen::analyze_scope_var(scope_err_ptr_var& node)
 {
-    std::visit(Overload{[this](scope_ptr& scope)
-                        {
+    std::visit(Overload{[this](scope_ptr& scope) {
                             std::visit(Overload{[this](std::vector<statements_ptr_var>& vec) {},
                                                 [this](auto&&) {}},
                                        scope->stmts);
