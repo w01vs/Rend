@@ -251,4 +251,10 @@ struct ASTProgram : public ASTNode {
 };
 
 using program_ptr = std::unique_ptr<ASTProgram>;
+
+template <class... Ts> struct Overload : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts> Overload(Ts...) -> Overload<Ts...>;
+
 #endif // AST_DEF_HPP

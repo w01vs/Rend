@@ -15,9 +15,6 @@ class HIRGen {
     program_ptr& program_;
     int loop_depth_ = 0;
 
-    using HIR = std::variant<HIRAssign, HIRUnaryOp, HIRBinaryOp, HIRJump, HIRCondJump, LabelID,
-                             HIRLoad, HIRStore>;
-
     std::vector<HIR> hir_stmt_;
 
     LabelID current_label_;

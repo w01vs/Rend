@@ -13,11 +13,6 @@ struct Var {
     std::shared_ptr<type::BuiltinType> type;
 };
 
-template <class... Ts> struct Overload : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts> Overload(Ts...) -> Overload<Ts...>;
-
 class SemanticAnalyzer {
   public:
     SemanticAnalyzer(program_ptr&& program, ErrorReporter& reporter);
