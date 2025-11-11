@@ -29,7 +29,7 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                 }
                 else
                 {
-                    flattened_operands.push_back(std::move(flattened));
+                    flattened_operands.emplace_back(std::move(flattened));
                 }
             }
             flattened_operands.emplace_back(folded);
@@ -46,7 +46,7 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                 }
                 else
                 {
-                    flattened_operands.push_back(std::move(flattened));
+                    flattened_operands.emplace_back(std::move(flattened));
                 }
             }
             flattened_operands.emplace_back(folded);
@@ -63,7 +63,7 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                 }
                 else
                 {
-                    flattened_operands.push_back(std::move(flattened));
+                    flattened_operands.emplace_back(std::move(flattened));
                 }
             }
             flattened_operands.emplace_back(folded);
@@ -82,7 +82,7 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                 }
                 else
                 {
-                    flattened_operands.push_back(std::move(flattened));
+                    flattened_operands.emplace_back(std::move(flattened));
                 }
             }
             if(!folded)
@@ -105,7 +105,7 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                 }
                 else
                 {
-                    flattened_operands.push_back(std::move(flattened));
+                    flattened_operands.emplace_back(std::move(flattened));
                 }
             }
             flattened_operands.emplace_back(folded);
@@ -124,7 +124,7 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                 }
                 else
                 {
-                    flattened_operands.push_back(std::move(flattened));
+                    flattened_operands.emplace_back(std::move(flattened));
                 }
             }
             flattened_operands.emplace_back(folded ? 1 : 0);
@@ -141,10 +141,10 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
                 }
                 else
                 {
-                    flattened_operands.push_back(std::move(flattened));
+                    flattened_operands.emplace_back(std::move(flattened));
                 }
             }
-            flattened_operands.push_back(folded);
+            flattened_operands.emplace_back(folded);
         }
     default:
         break;
@@ -155,11 +155,13 @@ void HIRGen::fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator 
 void HIRGen::collect_operands(expression_ptr_var& expr, std::vector<FlattenedExpr>& operands,
                               Operator op) const
 {
-    std::visit(Overload{[&operands](integer_ptr& integer) { operands.push_back(integer->value); },
-                        [&operands](boolean_ptr& boolean) {
-                            operands.push_back(static_cast<int>(boolean->value));
+    std::visit(Overload{[&operands](integer_ptr& integer) {
+                            operands.emplace_back(integer->value);
                         },
-                        [&operands](identifier_ptr& ident) { operands.push_back(ident->name); },
+                        [&operands](boolean_ptr& boolean) {
+                            operands.emplace_back(static_cast<int>(boolean->value));
+                        },
+                        [&operands](identifier_ptr& ident) { operands.emplace_back(ident->name); },
                         [&operands, &op, this](expression_ptr& expr) {
                             if(expr->op == op)
                             {
@@ -168,7 +170,7 @@ void HIRGen::collect_operands(expression_ptr_var& expr, std::vector<FlattenedExp
                                 return;
                             }
 
-                            operands.push_back(std::move(expr));
+                            operands.emplace_back(std::move(expr));
                         },
                         [](auto&&) {}},
                expr);
@@ -177,13 +179,13 @@ void HIRGen::collect_operands(expression_ptr_var& expr, std::vector<FlattenedExp
 HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
 {
     return std::visit(
-        Overload{[](integer_ptr& integer) -> HIRExprFactor { return int(integer->value); },
+        Overload{[](integer_ptr& integer) -> HIRExprFactor { return integer->value; },
                  [](boolean_ptr& boolean) -> HIRExprFactor {
                      return static_cast<int>(boolean->value);
                  },
                  [this](identifier_ptr& ident) -> HIRExprFactor {
-                     VirtualRegisterID vreg{current_register_.value++};
-                     hir_stmt_.push_back(HIRLoad{vreg, ident->name});
+                     VirtualRegisterID vreg{current_register_++};
+                     hir_stmt_.emplace_back(std::in_place_type<HIRLoad>, vreg, ident->name);
                      return vreg;
                  },
                  [this](expression_ptr& expr) -> HIRExprFactor {
@@ -224,13 +226,12 @@ HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
                              }
 
                              fold_flat_constants(operands, op);
-                             // iterate remaining things and add instructions and return vreg with
-                             // result
-                             handle_flattened_expr(operands);
+                             return handle_flattened_expr(operands, op);
                          }
 
                          // try folding constants if both sides of expr are known
                      default:
+                         // unfold both subexpressions, but only if necessary.
                          break;
                      }
 
@@ -241,14 +242,89 @@ HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
 }
 // Flattenedexpr can contain identifiers, virtual registers or integer literals
 // there SHOULD not be any expression_ptr's
-HIRExprFactor HIRGen::handle_flattened_expr(std::vector<FlattenedExpr>& exprs)
+HIRExprFactor HIRGen::handle_flattened_expr(std::vector<FlattenedExpr>& exprs, Operator op)
 {
     if(exprs.size() == 1)
     {
-        // std visit and assign
+        return std::visit(
+            Overload{[](VirtualRegisterID& vreg) -> HIRExprFactor { return vreg; },
+                     [this](int& i) -> HIRExprFactor {
+                         VirtualRegisterID vreg{current_register_++};
+                         hir_stmt_.emplace_back(std::in_place_type<HIRAssign>, vreg, i);
+                         return vreg;
+                     },
+                     [this](std::string_view& view) -> HIRExprFactor {
+                         VirtualRegisterID vreg{current_register_++};
+                         hir_stmt_.emplace_back(std::in_place_type<HIRLoad>, vreg, view);
+                         return vreg;
+                     },
+                     [](auto&&) -> HIRExprFactor { return VirtualRegisterID{-1}; }},
+            exprs[0]);
     }
 
-    return 1;
+    HIRExprFactor accumulator = VirtualRegisterID{-1};
+    for(auto& flatexpr : exprs)
+    {
+        std::visit(
+            Overload{[this, &accumulator, &op](VirtualRegisterID& vreg) -> void {
+                         if(std::holds_alternative<VirtualRegisterID>(accumulator))
+                         {
+                             VirtualRegisterID acc = std::get<VirtualRegisterID>(accumulator);
+                             if(acc.value == -1)
+                             {
+                                 accumulator = vreg;
+                                 return;
+                             }
+                             VirtualRegisterID res_vreg{current_register_++};
+                             hir_stmt_.emplace_back(
+                                 std::in_place_type<HIRBinaryOp>, res_vreg, accumulator, op, vreg);
+                             accumulator = res_vreg;
+                         }
+                     },
+                     [this, &accumulator, &op](int& i) -> void {
+                         if(std::holds_alternative<VirtualRegisterID>(accumulator))
+                         {
+                             VirtualRegisterID acc = std::get<VirtualRegisterID>(accumulator);
+                             if(acc.value == -1)
+                             {
+                                 accumulator = i;
+                                 return;
+                             }
+                             VirtualRegisterID vreg{current_register_++};
+                             hir_stmt_.emplace_back(
+                                 std::in_place_type<HIRBinaryOp>, vreg, accumulator, op, i);
+                             accumulator = vreg;
+                         }
+                         accumulator = i;
+                     },
+                     //  [&accumulator](expression_ptr& expr) -> void {
+                     //      accumulator = VirtualRegisterID{-1};
+                     //  },
+                     [this, &accumulator, &op](std::string_view& view) -> void {
+                         if(std::holds_alternative<VirtualRegisterID>(accumulator))
+                         {
+                             VirtualRegisterID vreg{current_register_++};
+                             hir_stmt_.emplace_back(std::in_place_type<HIRLoad>, vreg, view);
+
+                             VirtualRegisterID acc = std::get<VirtualRegisterID>(accumulator);
+                             if(acc.value == -1)
+                             {
+                                 accumulator = vreg;
+                                 return;
+                             }
+                             VirtualRegisterID res_vreg{current_register_++};
+                             hir_stmt_.emplace_back(
+                                 std::in_place_type<HIRBinaryOp>, res_vreg, accumulator, op, vreg);
+                             accumulator = res_vreg;
+                         }
+                         VirtualRegisterID vreg{current_register_++};
+                         hir_stmt_.emplace_back(std::in_place_type<HIRLoad>, vreg, view);
+                         accumulator = vreg;
+                     },
+                     [&accumulator](auto&&) -> void { accumulator = VirtualRegisterID{-1}; }},
+            flatexpr);
+    }
+    return accumulator;
 }
 
 void HIRGen::analyze_stmt(statements_ptr_var& node)

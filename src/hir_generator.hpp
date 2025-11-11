@@ -25,7 +25,7 @@ class HIRGen {
 
     using FlattenedExpr = std::variant<VirtualRegisterID, int, expression_ptr, std::string_view>;
 
-    HIRExprFactor handle_flattened_expr(std::vector<FlattenedExpr>& exprs);
+    HIRExprFactor handle_flattened_expr(std::vector<FlattenedExpr>& exprs, Operator op);
 
     void fold_flat_constants(std::vector<FlattenedExpr>& operands, Operator op) const;
 

@@ -9,6 +9,10 @@
 struct VirtualRegisterID {
     int value;
     explicit VirtualRegisterID(int v) : value(v) {}
+    int operator++(int other)
+    {
+        return ++value;
+    }
 };
 
 using LabelID = int;
