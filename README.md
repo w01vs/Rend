@@ -4,7 +4,7 @@ A fully functioning compiler built from scratch to explore modern programming la
 
 ## Goal
 
-This project is an attempt at building a programming language and its compiler from the ground up using C++. My focus is understanding compiler structure, abstract syntax tree design, parsing techniques, semantic analysis, code generation and error recovery.
+This project is an attempt at building a programming language and its compiler from the ground up using C++. My focus is understanding compiler structure, abstract syntax tree design, code generation and optimization. Parsing techniques, semantic analysis and error recovery are also part of my compiler, but not a main priority (for now).
 To create a working programming language quickly, I will use the C runtime for tasks like heap allocation and file I/O when I get to it. I might implement custom versions of these functionalities in the future, depending on how hard it turns out to be ().
 
 ## Design and philosophy
@@ -32,4 +32,5 @@ Strongly inspired by:
 ## AI
 
 I only use Github Copilot for minor code snippets, documentation and repetitive tasks. No core logic or complex algorithms are AI-generated. I do use Gemini specifically for brainstorming and design discussions when I don't know how to approach a problem or if I feel like my approach is not optimal.
+
 
