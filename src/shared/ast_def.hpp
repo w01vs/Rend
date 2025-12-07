@@ -3,7 +3,7 @@
 
 #pragma once
 #include "operators.hpp"
-#include "tokens.hpp"
+#include "shared/sourcelocation.hpp"
 #include "type.hpp"
 #include <memory>
 #include <optional>
@@ -75,6 +75,7 @@ struct ASTExpression : public ASTExpressionBase {
     expression_ptr_var lhs;
     expression_ptr_var rhs;
     Operator op;
+    int weight; // for Sethi-Ullman algo
     ASTExpression(SourceLocation& loc, expression_ptr_var&& lhs, expression_ptr_var&& rhs,
                   Operator& op)
         : ASTExpressionBase(loc), lhs(std::move(lhs)), rhs(std::move(rhs)), op(op)
@@ -255,9 +256,5 @@ struct ASTProgram : public ASTNode {
 
 using program_ptr = std::unique_ptr<ASTProgram>;
 
-template <class... Ts> struct Overload : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts> Overload(Ts...) -> Overload<Ts...>;
 
 #endif // AST_DEF_HPP

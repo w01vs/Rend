@@ -2,7 +2,7 @@
 #define LEXER_HPP
 
 #pragma once
-#include "tokens.hpp"
+#include "frontend/tokens.hpp"
 #include <iostream>
 #include <vector>
 #include <unordered_map>

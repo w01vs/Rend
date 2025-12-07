@@ -2,7 +2,7 @@
 #define AST_BUILDER_HPP
 
 #pragma once
-#include "ast_def.hpp"
+#include "shared/ast_def.hpp"
 
 class ASTBuilder {
   public:

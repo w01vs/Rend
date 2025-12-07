@@ -2,11 +2,9 @@
 
 #define REPORT_ERROR(loc, msg, type) reporter_.report_error(loc, msg, type, __FILE__, __LINE__);
 
-using semantics::OperatorMatrixIndex;
-
 type::TypeRegistry& SemanticAnalyzer::typeregistry_ = type::TypeRegistry::instance();
 
-const std::unordered_map<OperatorMatrixIndex, semantics::OperatorResult>
+const std::unordered_map<OperatorMatrixIndex, OperatorResult>
     SemanticAnalyzer::OPERATOR_MATRIX = {
         // INT RESULTS
         {{typeregistry_._int_(), Operator::ADD, typeregistry_._int_()}, {typeregistry_._int_()}},

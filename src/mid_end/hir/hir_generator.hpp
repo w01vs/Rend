@@ -2,8 +2,9 @@
 #define HIR_GENERATOR
 
 #include "hir_def.hpp"
-#include "semantics.hpp"
+#include "mid_end/analysis/semantics.hpp"
 #include <unordered_map>
+#include <algorithm>
 
 class HIRGen {
   public:
@@ -22,6 +23,9 @@ class HIRGen {
     void visit_hirexpr(HIRExprFactor& fac);
 
     using FlattenedExpr = std::variant<VirtualRegisterID, int, expression_ptr, std::string_view>;
+
+    int sethi_ulmann(expression_ptr_var& expr);
+    int sethi_ulmann(const expression_ptr& expr);
 
     HIRExprFactor handle_flattened_expr(std::vector<FlattenedExpr>& exprs, Operator op);
 

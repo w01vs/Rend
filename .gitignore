@@ -10,3 +10,4 @@ comp
 *.out
 *.png
 hir_output.txt
+lir_output.txt

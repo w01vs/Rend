@@ -80,14 +80,14 @@ std::string hir_print(HIR& hir)
                                           hir_expr_print(binary.rhs);
                                },
                                [](HIRJump& jump) -> std::string {
-                                   return "GOTO L" + std::to_string(jump.label);
+                                   return "GOTO L" + std::to_string(jump.label.value);
                                },
                                [](HIRCondJump& condjump) -> std::string {
                                    return "IF_FALSE " + hir_expr_print(condjump.condition) +
-                                          " GOTO L" + std::to_string(condjump.label);
+                                          " GOTO L" + std::to_string(condjump.label.value);
                                },
                                [](LabelID& label) -> std::string {
-                                   return "L" + std::to_string(label) + ":";
+                                   return "L" + std::to_string(label.value) + ":";
                                },
                                [](HIRLoad& load) -> std::string {
                                    return "T" + std::to_string(load.reg.value) + " = LD " +

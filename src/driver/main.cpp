@@ -1,16 +1,17 @@
 #define DEBUG true
 
-#include "lexer.hpp"
-#include "parser.hpp"
-#include "semantics.hpp"
-#include "tokenstream.hpp"
-#include "hir_generator.hpp"
+#include "frontend/lexer/lexer.hpp"
+#include "frontend/parser/parser.hpp"
+#include "mid_end/analysis/semantics.hpp"
+#include "frontend/parser/tokenstream.hpp"
+#include "mid_end/hir/hir_generator.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-
+#include "backend/lir/lir_generator.hpp"
+#include "backend/codegen/codegen.hpp"
 
 bool errors_found = false;
 
@@ -87,6 +88,23 @@ int main(int argc, char* argv[])
         hir_out << hir_str << std::endl;
     }
     hir_out.close();
+
+
+    LIRGenerator lirgen{hir_stmts, semantic.variables()};
+    auto lir_stmts = lirgen.generate();
+
+    std::ofstream lir_out("lir_output.txt", std::ios::out);
+    for(auto& stmt : lir_stmts)
+    {
+        lir_out << to_string(stmt) << std::endl;
+    }
+
+    // following code is for generating assembly
+    CodeGenerator codegen{lir_stmts, lirgen.final_stack_size()};
+    const std::stringstream& assembly = codegen.generate();
+    std::ofstream asm_out("rend.asm", std::ios::out);
+    asm_out << assembly.str();
+    asm_out.close();
 
     return EXIT_SUCCESS; 
 

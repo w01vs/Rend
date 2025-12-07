@@ -216,6 +216,57 @@ HIRExprFactor HIRGen::fold_other(int lhs, int rhs, Operator op) const
     }
 }
 
+int HIRGen::sethi_ulmann(expression_ptr_var& expr_var)
+{
+    return std::visit(Overload{[](integer_ptr&) -> int {
+                                   return 0;
+                               },
+                               [](boolean_ptr&) -> int {
+                                   return 0;
+                               },
+                               [](identifier_ptr&) -> int {
+                                   return 1;
+                               },
+
+                               [this](expression_ptr& expr) -> int {
+                                   if(expr->weight != 0)
+                                       return expr->weight;
+
+                                   int lhs = sethi_ulmann(expr->lhs);
+                                   int rhs = sethi_ulmann(expr->rhs);
+
+                                   if(lhs == rhs)
+                                   {
+                                       expr->weight = lhs + 1;
+                                   }
+                                   else
+                                   {
+                                       expr->weight = std::max(lhs, rhs);
+                                   }
+                                   return expr->weight;
+                               },
+                               [](auto&&) -> int {
+                                   return 1;
+                               }},
+                      expr_var);
+}
+int HIRGen::sethi_ulmann(const expression_ptr& expr){
+    if (expr->weight != 0) {
+        return expr->weight;
+    }
+
+    int rhs = sethi_ulmann(expr->rhs);
+    int lhs = sethi_ulmann(expr->lhs);
+
+    if (lhs == rhs) {
+        expr->weight = lhs + 1;
+    }
+    else {
+        expr->weight = std::max(lhs, rhs);
+    }
+    return expr->weight;
+}
+
 HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
 {
     return std::visit(
@@ -232,6 +283,7 @@ HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
                  },
                  [this](expression_ptr& expr) -> HIRExprFactor {
                      Operator op = expr->op;
+                     //
                      switch(op)
                      {
                      case Operator::ADD:
@@ -270,6 +322,19 @@ HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
                              }
 
                              fold_comm_assoc(operands, op);
+
+                             std::sort(operands.begin(), operands.end(), [this](const FlattenedExpr& a, const FlattenedExpr& b) {
+                                 auto get_weight = [this](const FlattenedExpr& expr) -> int {
+                                    if(std::holds_alternative<expression_ptr>(expr)) {
+                                        const expression_ptr& ptr = std::get<expression_ptr>(expr);
+                                        return sethi_ulmann(ptr);
+                                    }
+                                    return 1;
+                                 };
+                                 return get_weight(a) > get_weight(b);}
+                             );
+
+
                              return handle_flattened_expr(operands, op);
                          }
 
@@ -285,23 +350,33 @@ HIRExprFactor HIRGen::unfold_expression(expression_ptr_var& expr)
                      case Operator::LSH:
                      case Operator::RSH:
                          {
-                             // try folding constants if both sides of expr are known
-                             std::pair<HIRExprFactor, HIRExprFactor> sides{
-                                 unfold_expression(expr->lhs), unfold_expression(expr->rhs)};
-                             if(std::holds_alternative<int>(sides.first) &&
-                                std::holds_alternative<int>(sides.second))
+                             int w_lhs = sethi_ulmann(expr->lhs);
+                             int w_rhs = sethi_ulmann(expr->rhs);
+
+                             HIRExprFactor first{0}, second{0};
+
+                             if(w_lhs > w_rhs)
                              {
-                                 return fold_other(std::get<int>(sides.first),
-                                                   std::get<int>(sides.second),
-                                                   op);
+                                 first = unfold_expression(expr->rhs);
+                                 second = unfold_expression(expr->lhs);
+                             }
+                             else
+                             {
+                                 first = unfold_expression(expr->lhs);
+                                 second = unfold_expression(expr->rhs);
+                             }
+                             expr->weight = std::max(w_lhs, w_rhs) + 1;
+
+                             // try folding constants if both sides of expr are known
+                             if(std::holds_alternative<int>(first) &&
+                                std::holds_alternative<int>(second))
+                             {
+                                 return fold_other(std::get<int>(first), std::get<int>(second), op);
                              }
 
                              VirtualRegisterID vreg{current_register_++};
-                             hir_stmt_.emplace_back(std::in_place_type<HIRBinaryOp>,
-                                                    vreg,
-                                                    sides.first,
-                                                    op,
-                                                    sides.second);
+                             hir_stmt_.emplace_back(
+                                 std::in_place_type<HIRBinaryOp>, vreg, first, op, second);
                              return vreg;
                          }
                      case Operator::NOT:

@@ -533,8 +533,8 @@ std::optional<else_ptr_var> Parser::parse_else() const
                                std::move(else_if_clause));
 }
 
-// Expects tokens: BRACE_L
-// Will continue parsing assuming that those tokens were confirmed
+// Does not expect any token
+// Will throw an error if the next token is not BRACE_L
 // Will return a scope statement
 scope_err_ptr_var Parser::parse_scope() const
 {
@@ -572,7 +572,7 @@ scope_err_ptr_var Parser::parse_scope() const
 }
 
 // Expects tokens: KW_STRUCT
-// Will continue parsing assuming that those tokens were confirmed
+// Will continue parsing assuming that those tokens were confirmed but not consumed
 // Will return a struct statement
 statements_ptr_var Parser::parse_struct() const
 {

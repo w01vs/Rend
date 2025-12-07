@@ -2,9 +2,9 @@
 #define PARSER_HPP
 
 #include "ast_builder.hpp"
-#include "ast_def.hpp"
-#include "errors.hpp"
-#include "tokens.hpp"
+#include "shared/ast_def.hpp"
+#include "shared/errors.hpp"
+#include "frontend/tokens.hpp"
 #include "tokenstream.hpp"
 #include <iostream>
 #include <memory>

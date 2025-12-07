@@ -1,9 +1,10 @@
 #ifndef HIR_DEF_HPP
 #define HIR_DEF_HPP
 
-#include "ast_def.hpp"
-#include "operators.hpp"
-#include "label_manager.hpp"
+#include "shared/ast_def.hpp"
+#include "shared/operators.hpp"
+#include "mid_end/hir/label_manager.hpp"
+#include "shared/visit_overload.hpp"
 #include <string>
 #include <variant>
 

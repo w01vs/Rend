@@ -1,17 +1,11 @@
 #ifndef SEMANTICS_HPP
 #define SEMANTICS_HPP
 
-#include "ast_def.hpp"
-#include "errors.hpp"
-#include "operator_matrix_index.hpp"
+#include "shared/ast_def.hpp"
+#include "shared/visit_overload.hpp"
+#include "shared/errors.hpp"
+#include "shared/operator_matrix_index.hpp"
 #include <unordered_map>
-
-using namespace semantics;
-
-struct Var {
-    std::string_view name;
-    std::shared_ptr<type::BuiltinType> type;
-};
 
 class SemanticAnalyzer {
   public:
