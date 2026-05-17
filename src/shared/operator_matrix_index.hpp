@@ -1,12 +1,15 @@
 #pragma once
 #include <functional>
 #include <utility>
+#include <optional>
 #include "type.hpp"
 #include "operators.hpp"
 
 struct Var {
     std::string_view name;
     std::shared_ptr<type::BuiltinType> type;
+    int scope_id;
+    std::optional<long> constant_value;
 };
 
 struct OperatorMatrixIndex {

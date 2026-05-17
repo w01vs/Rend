@@ -61,13 +61,15 @@ struct HIRBinaryOp {
 struct HIRLoad {
     VirtualRegisterID reg;
     std::string_view source;
-    HIRLoad(VirtualRegisterID vreg, std::string_view src) : reg(vreg), source(src) {}
+    int scope_id;
+    HIRLoad(VirtualRegisterID vreg, std::string_view src, int scope_id) : reg(vreg), source(src), scope_id(scope_id) {}
 };
 
 struct HIRStore {
     HIRExprFactor reg;
     std::string_view dest;
-    HIRStore(HIRExprFactor vreg, std::string_view dest) : reg(vreg), dest(dest) {}
+    int scope_id;
+    HIRStore(HIRExprFactor vreg, std::string_view dest, int scope_id) : reg(vreg), dest(dest), scope_id(scope_id) {}
 };
 
 struct HIRReturn {

@@ -42,8 +42,9 @@ using expr_err_ptr = std::unique_ptr<ASTExpressionError>;
 
 struct ASTIdentifier : public ASTExpressionBase {
     std::string_view name;
+    int scope_id;
     ASTIdentifier(SourceLocation& loc, std::string_view name)
-        : ASTExpressionBase(loc), name(std::move(name))
+        : ASTExpressionBase(loc), name(std::move(name)), scope_id(-1)
     {
     }
 };
@@ -94,10 +95,10 @@ struct ASTReturn : public ASTStatementBase {
 using return_ptr = std::unique_ptr<ASTReturn>;
 
 struct ASTAssign : public ASTStatementBase {
-    std::string_view name;
+    identifier_ptr ident;
     expression_ptr_var expr;
-    ASTAssign(SourceLocation& loc, std::string_view name, expression_ptr_var&& expr)
-        : ASTStatementBase(loc), name(std::move(name)), expr(std::move(expr))
+    ASTAssign(SourceLocation& loc, identifier_ptr&& ident, expression_ptr_var&& expr)
+        : ASTStatementBase(loc), ident(std::move(ident)), expr(std::move(expr))
     {
     }
 };
@@ -107,11 +108,11 @@ using assign_ptr = std::unique_ptr<ASTAssign>;
 struct ASTDeclareAssign : public ASTStatementBase {
     std::shared_ptr<type::BuiltinType> type;
     std::string_view type_name;
-    std::string_view name;
+    identifier_ptr ident;
     expression_ptr_var expr;
-    ASTDeclareAssign(SourceLocation& loc, std::string_view type, std::string_view name,
+    ASTDeclareAssign(SourceLocation& loc, std::string_view type, identifier_ptr&& ident,
                      expression_ptr_var&& expr)
-        : ASTStatementBase(loc), type_name(std::move(type)), name(std::move(name)),
+        : ASTStatementBase(loc), type_name(std::move(type)), ident(std::move(ident)),
           expr(std::move(expr)), type(nullptr)
     {
     }
@@ -122,9 +123,9 @@ using declareassign_ptr = std::unique_ptr<ASTDeclareAssign>;
 struct ASTDeclaration : public ASTStatementBase {
     std::shared_ptr<type::BuiltinType> type;
     std::string_view type_name;
-    std::string_view name;
-    ASTDeclaration(SourceLocation& loc, std::string_view type, std::string_view&& name)
-        : ASTStatementBase(loc), type_name(std::move(type)), name(std::move(name)), type(nullptr)
+    identifier_ptr ident;
+    ASTDeclaration(SourceLocation& loc, std::string_view type, identifier_ptr&& ident)
+        : ASTStatementBase(loc), type_name(std::move(type)), ident(std::move(ident)), type(nullptr)
     {
     }
 };

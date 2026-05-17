@@ -16,7 +16,7 @@ src/driver/main.cpp
 src/frontend/lexer/lexer.cpp
 src/frontend/parser/tokenstream.cpp
 src/shared/type.cpp
-src/frontend/parser/ast_builder.cpp
+src/shared/ast_builder.cpp
 src/frontend/parser/parser.cpp
 src/mid_end/analysis/semantics.cpp
 src/mid_end/hir/hir_generator.cpp
@@ -24,7 +24,8 @@ src/mid_end/hir/hir_def.cpp
 src/backend/lir/lir_generator.cpp
 src/backend/lir/lir_def.cpp
 src/backend/codegen/codegen.cpp
-src/backend/register_allocator/register_allocator.cpp
+# src/backend/register_allocator/register_allocator.cpp
+# src/mid_end/optimizer/constants.cpp
 )
 
 target_include_directories(Rend PUBLIC src)

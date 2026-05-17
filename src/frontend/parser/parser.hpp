@@ -1,7 +1,7 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-#include "ast_builder.hpp"
+#include "shared/ast_builder.hpp"
 #include "shared/ast_def.hpp"
 #include "shared/errors.hpp"
 #include "frontend/tokens.hpp"

@@ -22,7 +22,7 @@ struct ConditionContext {
 class LIRGenerator {
   public:
     LIRGenerator(std::vector<HIR>& hir_statements,
-                 std::map<std::string_view, Var, std::less<>>& symbols);
+                 std::map<std::pair<std::string_view, int>, Var, std::less<>>& symbols);
     ~LIRGenerator();
 
     std::vector<LIRInstruction> generate();
@@ -38,8 +38,8 @@ class LIRGenerator {
     int total_offset_ = 0;
     int max_virtual_register_ = 0;
     ConditionContext cond_ctx_;
-    std::map<std::string_view, Var, std::less<>>& symbols_;
-    std::map<std::string_view, int> variable_offsets_;
+    std::map<std::pair<std::string_view, int>, Var, std::less<>>& symbols_;
+    std::map<std::pair<std::string_view, int>, int, std::less<>> variable_offsets_;
 
     VirtualRegisterID track_virtual_register(VirtualRegisterID& reg);
 

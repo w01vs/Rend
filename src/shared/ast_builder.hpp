@@ -19,14 +19,14 @@ class ASTBuilder {
     else_ptr build_else(SourceLocation& loc, std::optional<expression_ptr_var>&& cond,
                         scope_err_ptr_var&& scope, std::optional<else_ptr_var>&& else_if_clause) const;
 
-    assign_ptr build_assign(SourceLocation& loc, std::string_view name,
+    assign_ptr build_assign(SourceLocation& loc, identifier_ptr&& ident,
                             expression_ptr_var&& expr) const;
 
     declare_ptr build_declare(SourceLocation& loc, std::string_view type_name,
-                              std::string_view name) const;
+                              identifier_ptr&& ident) const;
 
     declareassign_ptr build_declareassign(SourceLocation& loc, std::string_view type_name,
-                                          std::string_view name, expression_ptr_var&& expr) const;
+                                          identifier_ptr&& ident, expression_ptr_var&& expr) const;
 
     integer_ptr build_integer(SourceLocation& loc, int value) const;
 

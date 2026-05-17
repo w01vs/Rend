@@ -1,7 +1,6 @@
 #include "parser.hpp"
 
-#define REPORT_ERROR(loc, msg, type) \
-    reporter_.report_error(loc, msg, type, __FILE__, __LINE__);
+#define REPORT_ERROR(loc, msg, type) reporter_.report_error(loc, msg, type, __FILE__, __LINE__);
 
 const std::unordered_map<TokenType, int> Parser::PRECEDENCE{
     {TokenType::OP_LOGICAL_OR, 1},
@@ -108,9 +107,7 @@ statements_ptr_var Parser::parse_statement() const
         }
     default:
         {
-            REPORT_ERROR(token.value().loc,
-                                   "No statement was found.",
-                                   ErrorType::UNKNOWN);
+            REPORT_ERROR(token.value().loc, "No statement was found.", ErrorType::UNKNOWN);
             synchronize_tokens();
             return builder_.build_stmt_err(token.value().loc);
         }
@@ -145,14 +142,13 @@ statements_ptr_var Parser::parse_from_ident() const
             auto semi = stream_.expect(TokenType::DELIMITER_SEMICOLON);
             if(!semi.has_value())
             {
-                REPORT_ERROR(ident_name.loc,
-                                       "Expected ';' after assignment.",
-                                       ErrorType::SYNTAX);
+                REPORT_ERROR(ident_name.loc, "Expected ';' after assignment.", ErrorType::SYNTAX);
                 synchronize_tokens();
                 return builder_.build_stmt_err(ident_name.loc);
             }
 
-            return builder_.build_assign(ident_name.loc, ast_ident_name, std::move(expr));
+            auto ast_ident = builder_.build_identifier(ident_name.loc, ast_ident_name);
+            return builder_.build_assign(ident_name.loc, std::move(ast_ident), std::move(expr));
         }
     case TokenType::IDENTIFIER:
         return parse_declassign();
@@ -184,7 +180,8 @@ statements_ptr_var Parser::parse_assign() const
 
     auto ast_name = name.value;
 
-    return builder_.build_assign(name.loc, ast_name, std::move(expr));
+    auto ast_ident = builder_.build_identifier(name.loc, ast_name);
+    return builder_.build_assign(name.loc, std::move(ast_ident), std::move(expr));
 }
 
 // IDENT IDENT ...
@@ -219,15 +216,16 @@ statements_ptr_var Parser::parse_declassign() const
             if(!semi.has_value())
             {
                 REPORT_ERROR(ident_name.loc,
-                                       "Expected ';' after declaration and assignment.",
-                                       ErrorType::SYNTAX);
+                             "Expected ';' after declaration and assignment.",
+                             ErrorType::SYNTAX);
                 synchronize_tokens();
                 return builder_.build_stmt_err(ident_name.loc);
             }
 
+            auto ast_ident = builder_.build_identifier(ident_name.loc, ast_ident_name);
             return builder_.build_declareassign(ident_name.loc,
                                                 ast_ident_type,
-                                                ast_ident_name,
+                                                std::move(ast_ident),
                                                 std::move(expr));
         }
     case TokenType::DELIMITER_SEMICOLON:
@@ -240,7 +238,8 @@ statements_ptr_var Parser::parse_declassign() const
             auto ast_type = type.value;
             auto ast_name = name.value;
 
-            return builder_.build_declare(type.loc, ast_type, ast_name);
+            auto ast_ident = builder_.build_identifier(name.loc, ast_name);
+            return builder_.build_declare(type.loc, ast_type, std::move(ast_ident));
         }
     default:
         {
@@ -260,9 +259,7 @@ expression_ptr_var Parser::parse_expression(int min_prec) const
     if(!token.has_value())
     {
         auto empty_loc = SourceLocation{0, 0, false};
-        REPORT_ERROR(empty_loc,
-                               "Expected expression but found end of input.",
-                               ErrorType::SYNTAX);
+        REPORT_ERROR(empty_loc, "Expected expression but found end of input.", ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_expr_err(empty_loc);
     }
@@ -285,7 +282,7 @@ expression_ptr_var Parser::parse_expression(int min_prec) const
     case TokenType::PAREN_L:
         {
             auto expr = parse_expression();
-            auto close = stream_.expect(TokenType::PAREN_L);
+            auto close = stream_.expect(TokenType::PAREN_R);
 
             if(!close.has_value())
             {
@@ -331,10 +328,8 @@ expression_ptr_var Parser::parse_expression(int min_prec) const
         const int next_prec = prec.value() + 1;
         auto rhs = parse_expression(next_prec);
 
-        lhs = builder_.build_expression(token.value().loc,
-                                        std::move(lhs),
-                                        std::move(rhs),
-                                        token_to_operator(type));
+        lhs =
+            builder_.build_expression(loc, std::move(lhs), std::move(rhs), token_to_operator(type));
     }
 
     return lhs;
@@ -371,21 +366,23 @@ statements_ptr_var Parser::parse_builtin_var(BuiltinType type) const
             {
                 auto loc = stream_.peek().value().loc;
                 REPORT_ERROR(loc,
-                                       "Expected ';' after declaration and assignment.",
-                                       ErrorType::SYNTAX);
+                             "Expected ';' after declaration and assignment.",
+                             ErrorType::SYNTAX);
                 synchronize_tokens();
                 return builder_.build_stmt_err(loc);
             }
 
+            auto ast_ident = builder_.build_identifier(builtin_type.loc, ast_name);
             return builder_.build_declareassign(builtin_type.loc,
                                                 type_ast,
-                                                ast_name,
+                                                std::move(ast_ident),
                                                 std::move(expr));
         }
     case TokenType::DELIMITER_SEMICOLON:
         {
             stream_.consume();
-            return builder_.build_declare(builtin_type.loc, type_ast, ast_name);
+            auto ast_ident = builder_.build_identifier(builtin_type.loc, ast_name);
+            return builder_.build_declare(builtin_type.loc, type_ast, std::move(ast_ident));
         }
     default:
         {
@@ -428,9 +425,8 @@ statements_ptr_var Parser::parse_while() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected '(' after 'while' on line " +
-                                   std::to_string(token.loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected '(' after 'while' on line " + std::to_string(token.loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -442,9 +438,8 @@ statements_ptr_var Parser::parse_while() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected ')' after expression on line " +
-                                   std::to_string(token.loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected ')' after expression on line " + std::to_string(token.loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -465,8 +460,8 @@ statements_ptr_var Parser::parse_if() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected '(' after 'if' on line " + std::to_string(token.loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected '(' after 'if' on line " + std::to_string(token.loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -478,9 +473,8 @@ statements_ptr_var Parser::parse_if() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected ')' after expression on line " +
-                                   std::to_string(token.loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected ')' after expression on line " + std::to_string(token.loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -514,9 +508,9 @@ std::optional<else_ptr_var> Parser::parse_else() const
             {
                 auto loc = stream_.peek().value().loc;
                 REPORT_ERROR(loc,
-                                       "Expected ')' after else condition on line " +
-                                           std::to_string(else_kw->loc.line),
-                                       ErrorType::SYNTAX);
+                             "Expected ')' after else condition on line " +
+                                 std::to_string(else_kw->loc.line),
+                             ErrorType::SYNTAX);
                 synchronize_tokens();
                 return std::nullopt;
             }
@@ -543,8 +537,8 @@ scope_err_ptr_var Parser::parse_scope() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected '{' at start of scope on line " + std::to_string(loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected '{' at start of scope on line " + std::to_string(loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -561,9 +555,8 @@ scope_err_ptr_var Parser::parse_scope() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected '}' at end of scope on line " +
-                                   std::to_string(open_br->loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected '}' at end of scope on line " + std::to_string(open_br->loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_scope(loc, std::move(stmts));
     }
@@ -582,9 +575,8 @@ statements_ptr_var Parser::parse_struct() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected identifier as type name on line " +
-                                   std::to_string(loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected identifier as type name on line " + std::to_string(loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -596,9 +588,8 @@ statements_ptr_var Parser::parse_struct() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected '{' after struct declaration on line " +
-                                   std::to_string(loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected '{' after struct declaration on line " + std::to_string(loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -612,9 +603,9 @@ statements_ptr_var Parser::parse_struct() const
         {
             synchronize_tokens();
             REPORT_ERROR(next->loc,
-                                   "Invalid member declaration in struct on line " +
-                                       std::to_string(next->loc.line),
-                                   ErrorType::SYNTAX);
+                         "Invalid member declaration in struct on line " +
+                             std::to_string(next->loc.line),
+                         ErrorType::SYNTAX);
             return builder_.build_stmt_err(next->loc);
         }
         members.emplace_back(std::move(member.value()));
@@ -626,8 +617,8 @@ statements_ptr_var Parser::parse_struct() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected '}' after struct body on line " + std::to_string(loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected '}' after struct body on line " + std::to_string(loc.line),
+                     ErrorType::SYNTAX);
         synchronize_tokens();
         return builder_.build_stmt_err(loc);
     }
@@ -666,15 +657,16 @@ struct_body_var Parser::parse_struct_declassign() const
             if(!semi.has_value())
             {
                 REPORT_ERROR(ident_name.loc,
-                                       "Expected ';' after declaration and assignment.",
-                                       ErrorType::SYNTAX);
+                             "Expected ';' after declaration and assignment.",
+                             ErrorType::SYNTAX);
                 synchronize_tokens();
                 return builder_.build_stmt_err(ident_name.loc);
             }
 
+            auto ast_ident = builder_.build_identifier(ident_name.loc, ast_ident_name);
             return builder_.build_declareassign(ident_name.loc,
                                                 ast_ident_type,
-                                                ast_ident_name,
+                                                std::move(ast_ident),
                                                 std::move(expr));
         }
     case TokenType::DELIMITER_SEMICOLON:
@@ -687,7 +679,8 @@ struct_body_var Parser::parse_struct_declassign() const
             auto ast_type = type.value;
             auto ast_name = name.value;
 
-            return builder_.build_declare(type.loc, ast_type, ast_name);
+            auto ast_ident = builder_.build_identifier(type.loc, ast_name);
+            return builder_.build_declare(type.loc, ast_type, std::move(ast_ident));
         }
     default:
         {
@@ -709,9 +702,8 @@ std::optional<struct_body_var> Parser::struct_helper() const
     {
         auto loc = stream_.peek().value().loc;
         REPORT_ERROR(loc,
-                               "Expected member declaration in struct on line " +
-                                   std::to_string(loc.line),
-                               ErrorType::SYNTAX);
+                     "Expected member declaration in struct on line " + std::to_string(loc.line),
+                     ErrorType::SYNTAX);
         return std::nullopt;
     }
     return parse_struct_declassign();
@@ -734,9 +726,7 @@ void Parser::synchronize_tokens() const
         if(!token.has_value())
         {
             auto loc = SourceLocation{0, 0, false};
-            REPORT_ERROR(loc,
-                                   "Unexpected end of input during error recovery.",
-                                   ErrorType::SYNTAX);
+            REPORT_ERROR(loc, "Unexpected end of input during error recovery.", ErrorType::SYNTAX);
         }
 
         TokenType type = token->type;

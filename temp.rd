@@ -1,12 +1,9 @@
-int y = 3;
-int x = 5;
-
-if(x == y) {
-    return x;
+int y = (1 - 2) * (1 + 2) * 3;
+bool b = 5 > 6;
+if(!b) {
+    return 99;
 }
-else if(11 == x){
-    return 42;
+if(y > 10) {
+    y = 10;
 }
-else {
-    return 69;
-}
+return y;

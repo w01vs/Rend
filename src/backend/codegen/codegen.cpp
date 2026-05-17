@@ -148,13 +148,17 @@ void CodeGenerator::generate_binary_op(LIRInstruction& instr)
         }
     case OPCODE::MUL:
         {
-            code_ << "mul ";
+            code_ << "imul ";
             break;
         }
     case OPCODE::DIV:
         {
-            code_ << "div ";
-            break;
+            code_ << "cqo\n";
+            add_indent(code_);
+            code_ << "idiv rbx\n";
+            add_indent(code_);
+            code_ << "mov " << convert_operand(instr.dst) << ", rax\n";
+            return;
         }
     case OPCODE::MOD:
         {
@@ -192,7 +196,7 @@ void CodeGenerator::generate_binary_op(LIRInstruction& instr)
     // temporary
     code_ << "rax, rbx" << "\n";
     add_indent(code_);
-    code_ << "mov " << convert_operand(instr.left) << ", rax\n";
+    code_ << "mov " << convert_operand(instr.dst) << ", rax\n";
     // keep
     // code << convert_operand(instr.left) << ", " << convert_operand(instr.right) << "\n";
 }
@@ -253,7 +257,7 @@ void CodeGenerator::generate_unary_op(LIRInstruction& instr)
     // temporary
     code_ << "rax, rbx" << "\n";
     add_indent(code_);
-    code_ << "mov " << convert_operand(instr.left) << ", rax\n";
+    code_ << "mov " << convert_operand(instr.dst) << ", rax\n";
     // keep
     // code_ << convert_operand(instr.left) << "\n";
 }
@@ -359,7 +363,7 @@ void CodeGenerator::generate_setcc(LIRInstruction& instr)
     // temporary
     code_ << "al" << "\n";
     add_indent(code_);
-    code_ << "mov " << convert_operand(instr.left) << ", al\n";
+    code_ << "mov " << convert_operand(instr.dst) << ", rax\n";
 
     // later
     // requires single byte register

@@ -11,3 +11,4 @@ comp
 *.png
 hir_output.txt
 lir_output.txt
+errors.txt

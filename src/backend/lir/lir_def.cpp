@@ -41,8 +41,7 @@ std::string to_string(LIRInstruction& instr)
     case OPCODE::RET:
         return "RET " + to_string(instr.left);
     case OPCODE::CMP:
-        return "CMP " + to_string(instr.left) + ", " +
-               to_string(instr.right);
+        return "CMP " + to_string(instr.left) + ", " + to_string(instr.right);
     case OPCODE::JE:
         return "JE " + to_string(instr.dst);
     case OPCODE::JNE:
@@ -64,23 +63,17 @@ std::string to_string(LIRInstruction& instr)
     case OPCODE::LABEL:
         return to_string(instr.dst);
     case OPCODE::SETE:
-        return "SETE " + to_string(instr.dst) + ", " + to_string(instr.left) + ", " +
-               to_string(instr.right);
+        return "SETE " + to_string(instr.dst);
     case OPCODE::SETNE:
-        return "SETNE " + to_string(instr.dst) + ", " + to_string(instr.left) + ", " +
-               to_string(instr.right);
+        return "SETNE " + to_string(instr.dst);
     case OPCODE::SETG:
-        return "SETG " + to_string(instr.dst) + ", " + to_string(instr.left) + ", " +
-               to_string(instr.right);
+        return "SETG " + to_string(instr.dst); 
     case OPCODE::SETGE:
-        return "SETGE " + to_string(instr.dst) + ", " + to_string(instr.left) + ", " +
-               to_string(instr.right);
+        return "SETGE " + to_string(instr.dst);
     case OPCODE::SETL:
-        return "SETL " + to_string(instr.dst) + ", " + to_string(instr.left) + ", " +
-               to_string(instr.right);
+        return "SETL " + to_string(instr.dst); 
     case OPCODE::SETLE:
-        return "SETLE " + to_string(instr.dst) + ", " + to_string(instr.left) + ", " +
-               to_string(instr.right);
+        return "SETLE " + to_string(instr.dst); 
     case OPCODE::MOV:
         return "MOV " + to_string(instr.dst) + ", " + to_string(instr.left);
     case OPCODE::LEA:
@@ -118,6 +111,4 @@ std::string to_string(Operand& operand)
 }
 
 const std::string& reg_to_string(Register& reg)
-{
-    return register_map.at(reg);
-}
+{ return register_map.at(reg); }

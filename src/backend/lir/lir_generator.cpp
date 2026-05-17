@@ -1,7 +1,7 @@
 #include "lir_generator.hpp"
 
 LIRGenerator::LIRGenerator(std::vector<HIR>& hir_statements,
-                           std::map<std::string_view, Var, std::less<>>& symbols)
+                           std::map<std::pair<std::string_view, int>, Var, std::less<>>& symbols)
     : hir_statements_(hir_statements), symbols_(symbols)
 {
 }
@@ -13,7 +13,7 @@ std::vector<LIRInstruction> LIRGenerator::generate()
     for(auto const& [name, var] : symbols_)
     {
         // TODO: better offset alignment
-        variable_offsets_[name] = current_offset_;
+        variable_offsets_[{name.first, name.second}] = current_offset_;
         current_offset_ -= var.type->bytes;
     }
 
@@ -282,19 +282,21 @@ std::vector<LIRInstruction> LIRGenerator::generate()
                                                  std::monostate{});
                 },
                 [&](HIRLoad& load) {
-                    lir_statements_.emplace_back(OPCODE::MOV,
-                                                 track_virtual_register(load.reg),
-                                                 StackSlot{variable_offsets_[load.source],
-                                                           symbols_.at(load.source).type->bytes},
-                                                 std::monostate{});
+                    lir_statements_.emplace_back(
+                        OPCODE::MOV,
+                        track_virtual_register(load.reg),
+                        StackSlot{variable_offsets_[{load.source, load.scope_id}],
+                                  symbols_.at({load.source, load.scope_id}).type->bytes},
+                        std::monostate{});
                 },
                 [&](HIRStore& store) {
                     // use rbp offsets
-                    lir_statements_.emplace_back(OPCODE::MOV,
-                                                 StackSlot{variable_offsets_[store.dest],
-                                                           symbols_.at(store.dest).type->bytes},
-                                                 lower_factor(store.reg),
-                                                 std::monostate{});
+                    lir_statements_.emplace_back(
+                        OPCODE::MOV,
+                        StackSlot{variable_offsets_[{store.dest, store.scope_id}],
+                                  symbols_.at({store.dest, store.scope_id}).type->bytes},
+                        lower_factor(store.reg),
+                        std::monostate{});
                 },
                 [&](HIRReturn& ret) {
                     lir_statements_.emplace_back(OPCODE::RET,
@@ -327,9 +329,8 @@ Operand LIRGenerator::lower_factor(HIRExprFactor& fac)
 int LIRGenerator::final_stack_size()
 { return total_offset_ + max_virtual_register_ * 8; }
 
-int LIRGenerator::variable_stack_size() {
-    return total_offset_;
-}
+int LIRGenerator::variable_stack_size()
+{ return total_offset_; }
 
 VirtualRegisterID LIRGenerator::track_virtual_register(VirtualRegisterID& reg)
 {
