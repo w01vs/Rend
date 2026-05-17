@@ -1,12 +1,30 @@
 #include "codegen.hpp"
 
-CodeGenerator::CodeGenerator(std::vector<LIRInstruction>& lir_statements, int start_stack_size)
-    : lir_statements_(lir_statements), code_(), start_stack_size_(start_stack_size)
+CodeGenerator::CodeGenerator(std::vector<LIRInstruction>& lir_statements, int start_stack_size,
+                             int start_variable_stack_size)
+    : lir_statements_(lir_statements), code_(), start_stack_size_(start_stack_size),
+      start_variable_stack_size_(start_variable_stack_size)
 {
 }
 
 const std::stringstream& CodeGenerator::generate()
 {
+    generate_prefix();
+    generate_data();
+    generate_code();
+    final_ << prefix_.view() << data_.view() << code_.view();
+    return final_;
+}
+
+void CodeGenerator::generate_code()
+{
+    code_ << "# Code" << "\n";
+    add_indent(code_);
+    code_ << ".section .text\n";
+    add_indent(code_);
+    code_ << ".global main\n";
+    code_ << "main:\n";
+    open_stackframe();
     for(auto& lir_stmt : lir_statements_)
     {
         switch(lir_stmt.opcode)
@@ -83,16 +101,39 @@ const std::stringstream& CodeGenerator::generate()
             break;
         }
     }
+}
 
-    return code_;
+void CodeGenerator::open_stackframe()
+{
+    add_indent(code_);
+    code_ << "push rbp\n";
+    add_indent(code_);
+    code_ << "mov rbp, rsp\n";
+    add_indent(code_);
+    code_ << "sub rsp, " << std::to_string(start_stack_size_) << "\n";
+}
+
+void CodeGenerator::generate_prefix()
+{
+    prefix_ << "# Prefixes" << "\n";
+    prefix_ << ".intel_syntax noprefix\n\n";
+}
+
+void CodeGenerator::generate_data()
+{
+    data_ << "# Data" << "\n";
+    add_indent(data_);
+    data_ << ".section .data\n";
 }
 
 void CodeGenerator::generate_binary_op(LIRInstruction& instr)
 {
     // temporary
+    add_indent(code_);
     code_ << "mov rax, " << convert_operand(instr.left) << "\n";
+    add_indent(code_);
     code_ << "mov rbx, " << convert_operand(instr.right) << "\n";
-
+    add_indent(code_);
     switch(instr.opcode)
     {
     case OPCODE::ADD:
@@ -150,6 +191,7 @@ void CodeGenerator::generate_binary_op(LIRInstruction& instr)
     }
     // temporary
     code_ << "rax, rbx" << "\n";
+    add_indent(code_);
     code_ << "mov " << convert_operand(instr.left) << ", rax\n";
     // keep
     // code << convert_operand(instr.left) << ", " << convert_operand(instr.right) << "\n";
@@ -159,7 +201,7 @@ std::string CodeGenerator::convert_operand(Operand& op)
 {
     return std::visit(Overload{
                           [this](VirtualRegisterID& reg) -> std::string {
-                              int offset = reg.value * 8 + start_stack_size_;
+                              int offset = reg.value * 8 + start_variable_stack_size_;
                               return "QWORD PTR[rbp - " + std::to_string(offset) + "]";
                           },
                           [](Register& reg) -> std::string {
@@ -189,8 +231,9 @@ std::string CodeGenerator::convert_operand(Operand& op)
 void CodeGenerator::generate_unary_op(LIRInstruction& instr)
 {
     // temporary
+    add_indent(code_);
     code_ << "mov rax, " << convert_operand(instr.left) << "\n";
-
+    add_indent(code_);
     switch(instr.opcode)
     {
     case OPCODE::NOT:
@@ -209,6 +252,7 @@ void CodeGenerator::generate_unary_op(LIRInstruction& instr)
 
     // temporary
     code_ << "rax, rbx" << "\n";
+    add_indent(code_);
     code_ << "mov " << convert_operand(instr.left) << ", rax\n";
     // keep
     // code_ << convert_operand(instr.left) << "\n";
@@ -216,6 +260,7 @@ void CodeGenerator::generate_unary_op(LIRInstruction& instr)
 
 void CodeGenerator::generate_jcc(LIRInstruction& instr)
 {
+    code_ << "    ";
     switch(instr.opcode)
     {
     case OPCODE::JE:
@@ -273,7 +318,9 @@ void CodeGenerator::generate_jcc(LIRInstruction& instr)
 // TODO: implement register shortening
 void CodeGenerator::generate_setcc(LIRInstruction& instr)
 {
+    add_indent(code_);
     code_ << "xor " << "rax" << ", " << "rax" << "\n";
+    add_indent(code_);
     switch(instr.opcode)
     {
     case OPCODE::SETE:
@@ -311,6 +358,7 @@ void CodeGenerator::generate_setcc(LIRInstruction& instr)
     }
     // temporary
     code_ << "al" << "\n";
+    add_indent(code_);
     code_ << "mov " << convert_operand(instr.left) << ", al\n";
 
     // later
@@ -321,9 +369,12 @@ void CodeGenerator::generate_setcc(LIRInstruction& instr)
 void CodeGenerator::generate_cmp(LIRInstruction& instr)
 {
     // temporary
+    add_indent(code_);
     code_ << "mov rax, " << convert_operand(instr.left) << "\n";
+    add_indent(code_);
     code_ << "mov rbx, " << convert_operand(instr.right) << "\n";
     // keep
+    add_indent(code_);
     code_ << "cmp ";
     // temporary
     code_ << "rax, rbx" << "\n";
@@ -336,11 +387,14 @@ void CodeGenerator::generate_mov(LIRInstruction& instr)
 {
     if(!std::holds_alternative<Register>(instr.dst))
     {
+        add_indent(code_);
         code_ << "mov rax, " << convert_operand(instr.left) << "\n";
+        add_indent(code_);
         code_ << "mov " << convert_operand(instr.dst) << ", rax\n";
     }
     else
     {
+        add_indent(code_);
         code_ << "mov ";
         code_ << convert_operand(instr.dst) << ", " << convert_operand(instr.left) << "\n";
     }
@@ -348,21 +402,31 @@ void CodeGenerator::generate_mov(LIRInstruction& instr)
 
 void CodeGenerator::generate_lea(LIRInstruction& instr)
 {
+    add_indent(code_);
     code_ << "lea ";
     code_ << convert_operand(instr.left) << ", " << convert_operand(instr.right) << "\n";
 }
 
 void CodeGenerator::generate_ret(LIRInstruction& instr)
 {
-    code_ << "ret ";
-    code_ << convert_operand(instr.left) << "\n";
+    add_indent(code_);
+    code_ << "mov rax, " << convert_operand(instr.left) << "\n";
+    add_indent(code_);
+    code_ << "leave\n";
+    add_indent(code_);
+    code_ << "ret\n";
 }
 
 void CodeGenerator::generate_label(LIRInstruction& instr)
 {
     LabelID label = std::get<LabelID>(instr.dst);
-    code_ << "." << generate_label_name(label) << ":" << "\n";
+    code_ << generate_label_name(label) << ":" << "\n";
 }
 
 std::string CodeGenerator::generate_label_name(LabelID label)
-{ return "L" + std::to_string(label.value); }
+{ return ".L" + std::to_string(label.value); }
+
+void CodeGenerator::add_indent(std::stringstream& stream, int indent)
+{
+    for(int i = 0; i < indent; i++) { stream << "    "; }
+}

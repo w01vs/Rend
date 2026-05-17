@@ -9,7 +9,7 @@ if [ $? -eq 0 ]; then
     fi
 
     # Run actual exec
-    # ./rend
+    ./rendout
     status=$?
     echo "exit code: $status"
 

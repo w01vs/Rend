@@ -100,18 +100,24 @@ int main(int argc, char* argv[])
     }
 
     // following code is for generating assembly
-    CodeGenerator codegen{lir_stmts, lirgen.final_stack_size()};
+    CodeGenerator codegen{lir_stmts, lirgen.final_stack_size(), lirgen.variable_stack_size()};
     const std::stringstream& assembly = codegen.generate();
-    std::ofstream asm_out("rend.asm", std::ios::out);
+    std::ofstream asm_out("rend.s", std::ios::out);
     asm_out << assembly.str();
     asm_out.close();
 
-    return EXIT_SUCCESS; 
 
     // Following code is for assembling and linking the generated assembly
     // but HIR generation is the current focus. LIR/assembly generation is pending.
-    int nasm_exitcode = system("nasm -felf64 -g rend.asm");
-    std::cout << "nasm exited assembling with code " << nasm_exitcode << std::endl;
-    int gcc_exitcode = system("gcc -g rend.o -o rend -lc");
-    std::cout << "gcc exited linking with code " << gcc_exitcode << std::endl;
+    int gcc_obj_exitcode = system("gcc -c rend.s -o rend.o");
+    std::cout << "gcc exited assembling with code " << gcc_obj_exitcode << std::endl;
+    int gcc_link_exitcode = system("gcc -g rend.o -o rendout -lc");
+    std::cout << "gcc exited linking with code " << gcc_link_exitcode << std::endl;
+
+    if(gcc_link_exitcode != 0 || gcc_obj_exitcode != 0){
+        std::cerr << "Failed to compile or link" << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::cout << "Successfully compiled and linked" << std::endl;
+    return EXIT_SUCCESS;
 }
