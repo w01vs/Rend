@@ -34,7 +34,7 @@ class LIRGenerator {
     std::vector<LIRInstruction> lir_statements_;
     int current_register_ = 0;
     int current_label_ = 0;
-    int current_offset_ = 0;
+    int current_offset_ = -8;
     int total_offset_ = 0;
     int max_virtual_register_ = 0;
     ConditionContext cond_ctx_;

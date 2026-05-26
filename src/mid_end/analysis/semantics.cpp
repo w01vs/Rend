@@ -26,7 +26,7 @@ const std::unordered_map<OperatorMatrixIndex, OperatorResult> SemanticAnalyzer::
     {{typeregistry_._bool_(), Operator::AND, typeregistry_._bool_()}, {typeregistry_._bool_()}},
     {{typeregistry_._bool_(), Operator::OR, typeregistry_._bool_()}, {typeregistry_._bool_()}},
     {{typeregistry_._bool_(), Operator::XOR, typeregistry_._bool_()}, {typeregistry_._bool_()}},
-    {{typeregistry_._bool_(), Operator::NOT, typeregistry_._bool_()}, {typeregistry_._bool_()}},
+    {{typeregistry_._bool_(), Operator::NOT, typeregistry_._undefined_()}, {typeregistry_._bool_()}},
 };
 
 SemanticAnalyzer::SemanticAnalyzer(program_ptr&& program, ErrorReporter& reporter)
@@ -128,7 +128,6 @@ void SemanticAnalyzer::analyze_stmt(statements_ptr_var& node)
 
                         },
                         [this](declareassign_ptr& declassign) {
-                            declassign->ident->scope_id = scope_stack_.back();
                             auto type = _typeof_(declassign->expr);
                             if(type == typeregistry_._undefined_())
                                 return;
@@ -151,7 +150,6 @@ void SemanticAnalyzer::analyze_stmt(statements_ptr_var& node)
                             declassign->type = type;
                         },
                         [this](declare_ptr& declare) {
-                            declare->ident->scope_id = scope_stack_.back();
                             auto type = typeregistry_.find_type(declare->type_name);
                             if(!declare_variable(declare->ident, type))
                                 REPORT_ERROR(declare->loc,
@@ -160,7 +158,6 @@ void SemanticAnalyzer::analyze_stmt(statements_ptr_var& node)
                             declare->type = type;
                         },
                         [this](assign_ptr& assign) {
-                            assign->ident->scope_id = scope_stack_.back();
                             auto var_type = find_variable_type(assign->ident);
                             if(var_type == typeregistry_._undefined_())
                                 return;
@@ -271,13 +268,9 @@ std::shared_ptr<type::BuiltinType> SemanticAnalyzer::_typeof_(expression_ptr_var
                                },
                                [this](expression_ptr& expr) -> std::shared_ptr<type::BuiltinType> {
                                    auto rhs = _typeof_(expr->rhs);
-                                   if(rhs == typeregistry_._undefined_())
-                                       return typeregistry_._undefined_();
                                    auto lhs = _typeof_(expr->lhs);
-                                   if(lhs == typeregistry_._undefined_())
-                                       return typeregistry_._undefined_();
 
-                                   OperatorMatrixIndex idx = {rhs, expr->op, lhs};
+                                   OperatorMatrixIndex idx = {lhs, expr->op, rhs};
                                    auto it = OPERATOR_MATRIX.find(idx);
                                    if(it == OPERATOR_MATRIX.end())
                                        return typeregistry_._undefined_();
@@ -300,7 +293,7 @@ bool SemanticAnalyzer::declare_variable(identifier_ptr& ident,
     auto it = variables_.find({ident->name, scope_stack_.back()});
     if(it != variables_.end())
         return false;
-    variables_[{ident->name, scope_stack_.back()}] = Var{ident->name, type};
+    variables_[{ident->name, scope_stack_.back()}] = Var{ident->name, type, scope_stack_.back()};
     ident->scope_id = scope_stack_.back();
     return true;
 }
@@ -316,6 +309,6 @@ std::shared_ptr<type::BuiltinType> SemanticAnalyzer::find_variable_type(identifi
     }
     if(it == variables_.end())
         return typeregistry_._undefined_();
-    ident->scope_id = scope_stack_.at(i);
+    ident->scope_id = it->second.scope_id;
     return it->second.type;
 }

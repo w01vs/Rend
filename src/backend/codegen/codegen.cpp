@@ -255,7 +255,7 @@ void CodeGenerator::generate_unary_op(LIRInstruction& instr)
     }
 
     // temporary
-    code_ << "rax, rbx" << "\n";
+    code_ << "rax" << "\n";
     add_indent(code_);
     code_ << "mov " << convert_operand(instr.dst) << ", rax\n";
     // keep

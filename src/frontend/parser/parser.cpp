@@ -42,6 +42,7 @@ const std::unordered_map<TokenType, Operator> Parser::TOKEN_OP{
     {TokenType::OP_MUL, Operator::MUL},
     {TokenType::OP_DIV, Operator::DIV},
     {TokenType::OP_MOD, Operator::MOD},
+    {TokenType::OP_NOT, Operator::NOT},
 };
 
 Parser::Parser(TokenStream& stream, ErrorReporter& reporter)

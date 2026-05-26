@@ -8,7 +8,8 @@ HIRGen::HIRGen(program_ptr& program,
 
 std::vector<HIR>& HIRGen::generate()
 {
-    for(auto& stmt : program_->stmts) { generate_stmt(stmt); }
+    int i = 0;
+    for(auto& stmt : program_->stmts) { generate_stmt(stmt); i++; }
     return hir_stmt_;
 }
 
