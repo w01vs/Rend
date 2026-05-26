@@ -1,14 +1,15 @@
 #!/bin/bash
 
-./build-Debug/Debug/comp temp.vx
+./build-Debug/Debug/Rend temp.rd
 
 if [ $? -eq 0 ]; then
-    if [ ! -f ./rend ]; then
-        echo "Error: ./rend does not exist. Please ensure the executable is built and in the correct location."
+    if [ ! -f ./build-Debug/Debug/Rend ]; then
+        echo "Error: ./Rend does not exist. Please ensure the executable is built and in the correct location."
         exit 1
     fi
 
-    ./rend
+    # Run actual exec
+    ./rendout
     status=$?
     echo "exit code: $status"
 

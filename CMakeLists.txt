@@ -10,12 +10,22 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/Release" )
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/Debug" )
 
+
 add_executable(Rend
-"src2/main.cpp"
-"src2/lexer.cpp"
-"src2/tokenstream.cpp"
-"src2/type.cpp"
-"src2/ast_builder.cpp"
-"src2/parser.cpp"
-"src2/semantics.cpp"
+src/driver/main.cpp
+src/frontend/lexer/lexer.cpp
+src/frontend/parser/tokenstream.cpp
+src/shared/type.cpp
+src/shared/ast_builder.cpp
+src/frontend/parser/parser.cpp
+src/mid_end/analysis/semantics.cpp
+src/mid_end/hir/hir_generator.cpp
+src/mid_end/hir/hir_def.cpp
+src/backend/lir/lir_generator.cpp
+src/backend/lir/lir_def.cpp
+src/backend/codegen/codegen.cpp
+# src/backend/register_allocator/register_allocator.cpp
+# src/mid_end/optimizer/constants.cpp
 )
+
+target_include_directories(Rend PUBLIC src)

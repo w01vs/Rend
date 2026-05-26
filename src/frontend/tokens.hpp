@@ -1,8 +1,9 @@
 #ifndef TOKENS_HPP
 #define TOKENS_HPP
 
-#pragma once
 #include <string>
+#include "shared/sourcelocation.hpp"
+
 enum class TokenType : char { 
     // Literals
     INT_LITERAL,     
@@ -60,12 +61,6 @@ enum class TokenType : char {
     IGNORE,              // For comments or whitespace if the lexer passes them through
     EOF_,                // End of File
     ERROR                // For tokens that could not be recognized
-};
-
-struct SourceLocation {
-    size_t line;
-    size_t column;
-    bool valid = true;
 };
 
 struct Token {

@@ -1,0 +1,89 @@
+#ifndef HIR_DEF_HPP
+#define HIR_DEF_HPP
+
+#include "shared/ast_def.hpp"
+#include "shared/operators.hpp"
+#include "mid_end/hir/label_manager.hpp"
+#include "shared/visit_overload.hpp"
+#include <string>
+#include <variant>
+
+struct VirtualRegisterID {
+    int value;
+    explicit VirtualRegisterID(int v) : value(v) {}
+    int operator++(int other)
+    {
+        return ++value;
+    }
+};
+
+using HIRExprFactor = std::variant<VirtualRegisterID, int>;
+
+struct HIRJump {
+    LabelID label;
+    HIRJump(LabelID label) : label(label) {}
+};
+// Jump to label if condition is false
+struct HIRCondJump {
+    HIRExprFactor condition;
+    LabelID label;
+    HIRCondJump(HIRExprFactor cond, LabelID label) : condition(cond), label(label) {}
+};
+
+struct HIRAssign {
+    VirtualRegisterID reg;
+    HIRExprFactor lhs;
+    HIRAssign(VirtualRegisterID vreg, HIRExprFactor expr) : reg(vreg), lhs(expr) {}
+};
+
+struct HIRUnaryOp {
+    VirtualRegisterID reg;
+    HIRExprFactor fac;
+    Operator op;
+
+    HIRUnaryOp(VirtualRegisterID vreg, HIRExprFactor expr, Operator op)
+        : reg(vreg), fac(expr), op(op)
+    {
+    }
+};
+
+struct HIRBinaryOp {
+    VirtualRegisterID reg;
+    HIRExprFactor lhs;
+    Operator op;
+    HIRExprFactor rhs;
+    HIRBinaryOp(VirtualRegisterID vreg, HIRExprFactor lhs, Operator op, HIRExprFactor rhs)
+        : reg(vreg), lhs(lhs), op(op), rhs(rhs)
+    {
+    }
+};
+
+struct HIRLoad {
+    VirtualRegisterID reg;
+    std::string_view source;
+    int scope_id;
+    HIRLoad(VirtualRegisterID vreg, std::string_view src, int scope_id) : reg(vreg), source(src), scope_id(scope_id) {}
+};
+
+struct HIRStore {
+    HIRExprFactor reg;
+    std::string_view dest;
+    int scope_id;
+    HIRStore(HIRExprFactor vreg, std::string_view dest, int scope_id) : reg(vreg), dest(dest), scope_id(scope_id) {}
+};
+
+struct HIRReturn {
+    HIRExprFactor value;
+    HIRReturn(HIRExprFactor v) : value(v) {}
+};
+
+using HIR = std::variant<HIRAssign, HIRUnaryOp, HIRBinaryOp, HIRJump, HIRCondJump, LabelID, HIRLoad,
+                         HIRStore, HIRReturn>;
+
+std::string operator_print(Operator op);
+
+std::string hir_expr_print(HIRExprFactor& expr);
+
+std::string hir_print(HIR& hir);
+
+#endif // HIR_DEF_HPP

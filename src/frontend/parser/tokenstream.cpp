@@ -1,5 +1,9 @@
 #include "tokenstream.hpp"
 
+TokenStream::TokenStream(std::vector<Token>& tokens) : tokens_(tokens), index_(0)
+{
+}
+
 std::optional<Token> TokenStream::peek(size_t offset) const
 {
     if(index_ < tokens_.size())

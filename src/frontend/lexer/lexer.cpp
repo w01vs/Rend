@@ -14,7 +14,7 @@ const std::unordered_map<std::string_view, TokenType> Lexer::KEYWORDS = {
     {"false", TokenType::BOOL_LITERAL},
 };
 
-Lexer::Lexer(std::string_view view) : view_(view), index_(0), line_(0), column_(0), errors_(0) {}
+Lexer::Lexer(std::string_view view) : view_(view), index_(0), line_(1), column_(1), errors_(0) {}
 
 Token Lexer::next_token()
 {
@@ -36,7 +36,7 @@ Token Lexer::next_token()
         return number_literal();
     case '+':
         advance();
-        return {TokenType::OP_ADD, "+",{line_, column_ - 1}};
+        return {TokenType::OP_ADD, "+", {line_, column_ - 1}};
     case '-':
         advance();
         return {TokenType::OP_SUB, "-", {line_, column_ - 1}};
@@ -81,13 +81,27 @@ Token Lexer::next_token()
         advance();
         return {TokenType::BRACE_R, "}", {line_, column_ - 1}};
     case '=':
-        advance();
-        return {TokenType::OP_ASSIGN, "=", {line_, column_ - 1}};
+        return assign_or_equals();
     default:
-        std::cerr << "Unexpected character: " << c << " on line " << line_ << ", column " << column_ << std::endl;
+        std::cerr << "Unexpected character: " << c << " on line " << line_ << ", column " << column_
+                  << std::endl;
         advance();
         errors_++;
         return {TokenType::ERROR, std::string_view(&c, 1), {line_, column_ - 1}};
+    }
+}
+
+Token Lexer::assign_or_equals()
+{
+    advance();
+    if(!is_eof() && expect('='))
+    {
+        advance();
+        return {TokenType::OP_EQUAL, "==", {line_, column_ - 2}};
+    }
+    else
+    {
+        return {TokenType::OP_ASSIGN, "=", {line_, column_ - 1}};
     }
 }
 
@@ -204,15 +218,19 @@ bool Lexer::is_eof()
 
 void Lexer::skip_insignificant()
 {
-    switch(view_.at(index_))
+    while(!is_eof())
     {
-    case '\t':
-    case '\n':
-    case ' ':
-        advance();
-        return;
-    default:
-        return;
+        switch(view_.at(index_))
+        {
+        case '\t':
+        case '\n':
+        case '\r':
+        case ' ':
+            advance();
+            break;
+        default:
+            return;
+        }
     }
 }
 

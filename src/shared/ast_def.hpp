@@ -2,41 +2,14 @@
 #define AST_DEF_HPP
 
 #pragma once
-#include "tokens.hpp"
+#include "operators.hpp"
+#include "shared/sourcelocation.hpp"
 #include "type.hpp"
 #include <memory>
 #include <optional>
 #include <string>
 #include <variant>
 #include <vector>
-
-enum class BuiltinType : char {
-    INT,
-    BOOL,
-};
-
-enum class Operator {
-    MUL,
-    DIV,
-    MOD,
-    ADD,
-    SUB,
-    LSH,
-    RSH,
-    LESS,
-    GREATER,
-    LESSEQ,
-    GREATEREQ,
-    BAND,
-    XOR,
-    BOR,
-    OR,
-    AND,
-    EQ,
-    NEQ,
-    NOT,
-    UNDEFINED,
-};
 
 struct ASTNode {
     SourceLocation loc;
@@ -69,8 +42,9 @@ using expr_err_ptr = std::unique_ptr<ASTExpressionError>;
 
 struct ASTIdentifier : public ASTExpressionBase {
     std::string_view name;
+    int scope_id;
     ASTIdentifier(SourceLocation& loc, std::string_view name)
-        : ASTExpressionBase(loc), name(std::move(name))
+        : ASTExpressionBase(loc), name(std::move(name)), scope_id(-1)
     {
     }
 };
@@ -96,21 +70,19 @@ struct ASTExpression;
 using expression_ptr = std::unique_ptr<ASTExpression>;
 
 using expression_ptr_var =
-    std::variant<expression_ptr, identifier_ptr,
-                 integer_ptr, boolean_ptr,
-                 expr_err_ptr>;
+    std::variant<expression_ptr, identifier_ptr, integer_ptr, boolean_ptr, expr_err_ptr>;
 
 struct ASTExpression : public ASTExpressionBase {
     expression_ptr_var lhs;
     expression_ptr_var rhs;
     Operator op;
+    int weight; // for Sethi-Ullman algo
     ASTExpression(SourceLocation& loc, expression_ptr_var&& lhs, expression_ptr_var&& rhs,
                   Operator& op)
         : ASTExpressionBase(loc), lhs(std::move(lhs)), rhs(std::move(rhs)), op(op)
     {
     }
 };
-
 
 struct ASTReturn : public ASTStatementBase {
     expression_ptr_var val;
@@ -123,10 +95,10 @@ struct ASTReturn : public ASTStatementBase {
 using return_ptr = std::unique_ptr<ASTReturn>;
 
 struct ASTAssign : public ASTStatementBase {
-    std::string_view name;
+    identifier_ptr ident;
     expression_ptr_var expr;
-    ASTAssign(SourceLocation& loc, std::string_view name, expression_ptr_var&& expr)
-        : ASTStatementBase(loc), name(std::move(name)), expr(std::move(expr))
+    ASTAssign(SourceLocation& loc, identifier_ptr&& ident, expression_ptr_var&& expr)
+        : ASTStatementBase(loc), ident(std::move(ident)), expr(std::move(expr))
     {
     }
 };
@@ -136,11 +108,12 @@ using assign_ptr = std::unique_ptr<ASTAssign>;
 struct ASTDeclareAssign : public ASTStatementBase {
     std::shared_ptr<type::BuiltinType> type;
     std::string_view type_name;
-    std::string_view name;
+    identifier_ptr ident;
     expression_ptr_var expr;
-    ASTDeclareAssign(SourceLocation& loc, std::string_view type,
-                     std::string_view name, expression_ptr_var&& expr)
-        : ASTStatementBase(loc), type_name(std::move(type)), name(std::move(name)), expr(std::move(expr)), type(nullptr)
+    ASTDeclareAssign(SourceLocation& loc, std::string_view type, identifier_ptr&& ident,
+                     expression_ptr_var&& expr)
+        : ASTStatementBase(loc), type_name(std::move(type)), ident(std::move(ident)),
+          expr(std::move(expr)), type(nullptr)
     {
     }
 };
@@ -150,9 +123,9 @@ using declareassign_ptr = std::unique_ptr<ASTDeclareAssign>;
 struct ASTDeclaration : public ASTStatementBase {
     std::shared_ptr<type::BuiltinType> type;
     std::string_view type_name;
-    std::string_view name;
-    ASTDeclaration(SourceLocation& loc, std::string_view type, std::string_view&& name)
-        : ASTStatementBase(loc), type_name(std::move(type)), name(std::move(name)), type(nullptr)
+    identifier_ptr ident;
+    ASTDeclaration(SourceLocation& loc, std::string_view type, identifier_ptr&& ident)
+        : ASTStatementBase(loc), type_name(std::move(type)), ident(std::move(ident)), type(nullptr)
     {
     }
 };
@@ -195,28 +168,31 @@ struct ASTBreak : public ASTStatementBase {
 using break_ptr = std::unique_ptr<ASTBreak>;
 
 struct ASTIf;
+struct ASTElse;
 
 using if_ptr = std::unique_ptr<ASTIf>;
+using else_ptr_var = std::variant<std::unique_ptr<ASTElse>, stmt_err_ptr>;
 
 struct ASTElse : public ASTStatementBase {
     std::optional<expression_ptr_var> condition;
     scope_err_ptr_var scope;
+    std::optional<else_ptr_var> else_if_clause;
     ASTElse(SourceLocation& loc, std::optional<expression_ptr_var>&& condition,
-            scope_err_ptr_var&& scope)
-        : ASTStatementBase(loc), condition(std::move(condition)), scope(std::move(scope))
+            scope_err_ptr_var&& scope, std::optional<else_ptr_var>&& else_if_clause)
+        : ASTStatementBase(loc), condition(std::move(condition)), scope(std::move(scope)),
+          else_if_clause(std::move(else_if_clause))
     {
     }
 
     ASTElse(std::unique_ptr<ASTElse>&& _else)
         : condition(std::move(_else->condition)), scope(std::move(_else->scope)),
-          ASTStatementBase(_else->loc)
+          ASTStatementBase(_else->loc), else_if_clause(std::move(_else->else_if_clause))
     {
     }
 };
 
 using else_ptr = std::unique_ptr<ASTElse>;
 
-using else_ptr_var = std::variant<std::unique_ptr<ASTElse>, stmt_err_ptr>;
 
 struct ASTIf : public ASTStatementBase {
     expression_ptr_var condition;
@@ -240,7 +216,7 @@ struct ASTStruct;
 using struct_ptr = std::unique_ptr<ASTStruct>;
 
 using statements_ptr_var =
-    std::variant<scope_ptr, break_ptr, continue_ptr, return_ptr, else_ptr, if_ptr, while_ptr,
+    std::variant<scope_ptr, break_ptr, continue_ptr, return_ptr, if_ptr, while_ptr,
                  struct_ptr, declareassign_ptr, declare_ptr, assign_ptr, stmt_err_ptr>;
 
 // Struct body will change in future
@@ -257,11 +233,11 @@ struct ASTStruct : public ASTStatementBase {
     }
 };
 
-using scope_err_vec_ptr = std::variant<std::vector<statements_ptr_var>, stmt_err_ptr>;
+using stmt_vec_err_ptr = std::variant<std::vector<statements_ptr_var>, stmt_err_ptr>;
 
 struct ASTScope : public ASTStatementBase {
-    scope_err_vec_ptr stmts; // all statements inside scope
-    ASTScope(SourceLocation& loc, scope_err_vec_ptr&& stmts)
+    stmt_vec_err_ptr stmts; // all statements inside scope
+    ASTScope(SourceLocation& loc, stmt_vec_err_ptr&& stmts)
         : ASTStatementBase(loc), stmts(std::move(stmts))
     {
     }
@@ -280,5 +256,6 @@ struct ASTProgram : public ASTNode {
 };
 
 using program_ptr = std::unique_ptr<ASTProgram>;
+
 
 #endif // AST_DEF_HPP

@@ -1,7 +1,10 @@
-int y = 3;
-int x = 1 + 2 * 3;
-while(y < 11){
-    y = y  + 1;
+int y = (1 - 2) * (1 + 2) * 3;
+bool b = 5 > 6;
+int x = 67;
+if(!b) {
+    return 99;
 }
-
+if(y > 10) {
+    y = 10;
+}
 return y;

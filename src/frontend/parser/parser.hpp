@@ -1,22 +1,38 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-#include "ast_builder.hpp"
-#include "ast_def.hpp"
-#include "errors.hpp"
-#include "tokens.hpp"
+#include "shared/ast_builder.hpp"
+#include "shared/ast_def.hpp"
+#include "shared/errors.hpp"
+#include "frontend/tokens.hpp"
 #include "tokenstream.hpp"
 #include <iostream>
 #include <memory>
 #include <unordered_map>
 
+enum class BuiltinType : char {
+    INT,
+    BOOL,
+};
+
 class Parser {
   public:
     Parser(TokenStream& stream, ErrorReporter& reporter);
 
+    program_ptr parse();
+
+  private:
+    static const std::unordered_map<TokenType, int> PRECEDENCE;
+    static const std::unordered_map<TokenType, Operator> TOKEN_OP;
+
+    type::TypeRegistry& type_registry_;
+    TokenStream& stream_;
+    ErrorReporter& reporter_;
+    ASTBuilder builder_;
+
     statements_ptr_var parse_statement() const;
 
-    expression_ptr_var parse_expression() const;
+    expression_ptr_var parse_expression(int min_prec = 0) const;
 
     statements_ptr_var parse_from_ident() const;
 
@@ -41,15 +57,6 @@ class Parser {
     std::optional<struct_body_var> struct_helper() const;
 
     scope_err_ptr_var parse_scope() const;
-
-  private:
-    static const std::unordered_map<TokenType, int> PRECEDENCE;
-    static const std::unordered_map<TokenType, Operator> TOKEN_OP;
-
-    type::TypeRegistry& type_registry_;
-    TokenStream& stream_;
-    ErrorReporter& reporter_;
-    ASTBuilder builder_;
 
     void synchronize_tokens() const;
 

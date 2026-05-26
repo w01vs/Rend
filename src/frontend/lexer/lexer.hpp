@@ -2,7 +2,7 @@
 #define LEXER_HPP
 
 #pragma once
-#include "tokens.hpp"
+#include "frontend/tokens.hpp"
 #include <iostream>
 #include <vector>
 #include <unordered_map>
@@ -19,6 +19,7 @@ class Lexer {
     size_t column_;
     size_t errors_;
 
+    Token assign_or_equals();
     Token identifier_or_keyword();
     Token number_literal();
     Token excl_mark();

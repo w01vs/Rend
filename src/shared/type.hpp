@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <mutex>
 namespace type
 {
     struct BuiltinType {
@@ -17,12 +18,12 @@ namespace type
         bool operator==(const std::shared_ptr<BuiltinType>& other) const;
         virtual ~BuiltinType() = default;
         bool is_compatible(const std::shared_ptr<BuiltinType>& other) const;
-
+        
+        int bytes;
       protected:
         BuiltinType(std::string_view name, int bytes);
         BuiltinType(std::string_view name);
         std::string_view name;
-        size_t bytes;
         size_t id;
         inline static int id_count = 0;
         friend class TypeRegistry;
